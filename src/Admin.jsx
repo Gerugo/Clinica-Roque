@@ -1,6 +1,14 @@
 import { useState, useEffect } from 'react'
 import { supabase } from './supabase.js'
 
+// Función auxiliar para generar el código alfanumérico
+const generarCodigo = () => {
+  const caracteres = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+  let codigo = ''
+  for (let i = 0; i < 3; i++) codigo += caracteres.charAt(Math.floor(Math.random() * caracteres.length))
+  return codigo
+}
+
 export default function Admin() {
   // Estado de Seguridad
   const [autenticado, setAutenticado] = useState(false)
@@ -8,8 +16,8 @@ export default function Admin() {
 
   // Estados de la Aplicación
   const [colas, setColas] = useState([])
-  const [turnoActual, setTurnoActual] = useState({}) // Guarda el objeto turno completo
-  const [esperaPorSala, setEsperaPorSala] = useState({}) // Contador de pacientes esperando
+  const [turnoActual, setTurnoActual] = useState({}) 
+  const [esperaPorSala, setEsperaPorSala] = useState({}) 
   const [nuevaConsulta, setNuevaConsulta] = useState('')
   const [creandoCola, setCreandoCola] = useState(false)
   const [cargandoCola, setCargandoCola] = useState(null)
@@ -29,7 +37,6 @@ export default function Admin() {
       setColas(colasData)
 
       const promesas = colasData.map(async (sala) => {
-        // 1. Obtener el último turno llamado
         const { data: dataLlamado } = await supabase
           .from('turnos')
           .select('*')
@@ -38,7 +45,6 @@ export default function Admin() {
           .order('updated_at', { ascending: false })
           .limit(1)
 
-        // 2. Obtener la cantidad de pacientes en espera
         const { count: countEspera } = await supabase
           .from('turnos')
           .select('*', { count: 'exact', head: true })
@@ -68,7 +74,6 @@ export default function Admin() {
 
     cargarDatos()
 
-    // Suscripción para actualizar el contador de espera en tiempo real
     const canalAdmin = supabase
       .channel('admin-updates')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'turnos' }, (payload) => {
@@ -116,23 +121,94 @@ export default function Admin() {
   }
 
   // =========================================================
-  // Función para invocar el servidor Push de Supabase
+  // NUEVO: Generar Turno Manual e Imprimir Ticket
   // =========================================================
+  const imprimirTicket = (salaNombre, numero) => {
+    const fecha = new Date().toLocaleDateString('es-ES')
+    const hora = new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
+    
+    // Abrimos una ventana oculta para la impresión
+    const ventanaImpresion = window.open('', '_blank', 'width=400,height=600');
+    
+    // Inyectamos HTML optimizado para impresoras térmicas
+    ventanaImpresion.document.write(`
+      <html>
+        <head>
+          <title>Ticket Clínica Roque</title>
+          <style>
+            body { font-family: 'Courier New', Courier, monospace; text-align: center; color: #000; margin: 0; padding: 20px; }
+            .ticket-container { max-width: 300px; margin: 0 auto; }
+            h1 { font-size: 1.5rem; margin-bottom: 5px; text-transform: uppercase; }
+            h2 { font-size: 1.2rem; margin-top: 0; font-weight: normal; border-bottom: 1px solid #000; padding-bottom: 10px; }
+            .numero-box { margin: 20px 0; padding: 10px 0; border-top: 2px dashed #000; border-bottom: 2px dashed #000; }
+            .numero { font-size: 4.5rem; font-weight: bold; margin: 0; letter-spacing: 2px; line-height: 1; }
+            p { font-size: 0.9rem; margin: 5px 0; }
+            .footer { margin-top: 20px; font-size: 0.8rem; border-top: 1px solid #000; padding-top: 10px; }
+            @media print {
+              @page { margin: 0; }
+              body { margin: 0.5cm; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="ticket-container">
+            <h1>Clínica Roque</h1>
+            <h2>${salaNombre}</h2>
+            <div class="numero-box">
+              <p>SU TURNO ES:</p>
+              <div class="numero">${numero}</div>
+            </div>
+            <p>Por favor, tome asiento.</p>
+            <p>Le avisaremos por las pantallas.</p>
+            <div class="footer">
+              Fecha: ${fecha} - Hora: ${hora}
+            </div>
+          </div>
+          <script>
+            // Lanza la impresión y cierra la ventana al terminar
+            window.onload = function() { 
+              window.print();
+              setTimeout(function() { window.close(); }, 500);
+            }
+          </script>
+        </body>
+      </html>
+    `);
+    ventanaImpresion.document.close();
+  }
+
+  const generarTurnoManual = async (salaId, salaNombre) => {
+    setCargandoCola(salaId)
+    const nuevoCodigo = generarCodigo()
+    
+    // Insertamos el turno sin suscripción push (es un paciente de sala de espera)
+    const { error } = await supabase
+      .from('turnos')
+      .insert([{ 
+        cola_id: salaId, 
+        numero: nuevoCodigo, 
+        estado: 'espera',
+        suscripcion_push: null 
+      }])
+
+    if (!error) {
+      imprimirTicket(salaNombre, nuevoCodigo)
+    } else {
+      alert('Error al generar el turno manual en la base de datos.')
+    }
+    setCargandoCola(null)
+  }
+
   const dispararPush = async (suscripcion, nombreSala, numero) => {
     try {
       await supabase.functions.invoke('enviar-alerta', {
-        body: {
-          suscripcion: suscripcion,
-          sala: nombreSala,
-          numero: numero
-        }
+        body: { suscripcion: suscripcion, sala: nombreSala, numero: numero }
       })
     } catch (error) {
       console.error("Error al enviar la notificación Push:", error)
     }
   }
 
-  // Lógica Principal: Llamar al siguiente de la cola
   const llamarSiguiente = async (salaId) => {
     setCargandoCola(salaId)
     
@@ -142,14 +218,11 @@ export default function Admin() {
 
     if (errorBusqueda) {
       alert('Error de conexión.')
-      setCargandoCola(null)
-      return
+      setCargandoCola(null); return
     }
-
     if (!turnosEspera || turnosEspera.length === 0) {
       alert('No hay pacientes en la sala de espera para esta consulta.')
-      setCargandoCola(null)
-      return
+      setCargandoCola(null); return
     }
 
     const turnoALlamar = turnosEspera[0]
@@ -160,19 +233,16 @@ export default function Admin() {
       setTurnoActual(prev => ({ ...prev, [salaId]: turnoALlamar }))
       setEsperaPorSala(prev => ({ ...prev, [salaId]: Math.max(0, (prev[salaId] || 1) - 1) }))
       
-      // Disparamos el Push si el paciente aceptó notificaciones
       if (turnoALlamar.suscripcion_push) {
         const sala = colas.find(c => c.id === salaId)
         dispararPush(turnoALlamar.suscripcion_push, sala.nombre, turnoALlamar.numero)
       }
-
     } else {
       alert('Error al llamar al paciente.')
     }
     setCargandoCola(null)
   }
 
-  // Volver a hacer sonar la pantalla / Push para el paciente actual
   const reLlamar = async (salaId) => {
     const turno = turnoActual[salaId]
     if (!turno) return
@@ -184,11 +254,9 @@ export default function Admin() {
       const sala = colas.find(c => c.id === salaId)
       dispararPush(turno.suscripcion_push, sala.nombre, turno.numero)
     }
-    
     setCargandoCola(null)
   }
 
-  // Marcar al paciente como no presentado / finalizado
   const descartarTurno = async (salaId) => {
     const turno = turnoActual[salaId]
     if (!turno) return
@@ -209,19 +277,12 @@ export default function Admin() {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: 'linear-gradient(135deg, #0f172a 0%, #020617 100%)', fontFamily: 'system-ui, sans-serif' }}>
         <form onSubmit={verificarPin} style={{ backgroundColor: 'rgba(30, 41, 59, 0.7)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.05)', padding: '4rem 3rem', borderRadius: '24px', textAlign: 'center', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.8)' }}>
-          <div style={{ marginBottom: '2rem' }}>
-            <span style={{ fontSize: '3rem' }}>🩺</span>
-          </div>
+          <div style={{ marginBottom: '2rem' }}><span style={{ fontSize: '3rem' }}>🩺</span></div>
           <h2 style={{ color: '#f8fafc', marginBottom: '2.5rem', fontWeight: '500', letterSpacing: '1px' }}>Acceso Médico</h2>
           <input 
-            type="password" 
-            placeholder="****" 
-            value={pin} 
-            onChange={(e) => setPin(e.target.value)}
+            type="password" placeholder="****" value={pin} onChange={(e) => setPin(e.target.value)}
             style={{ padding: '15px', fontSize: '2rem', width: '220px', textAlign: 'center', borderRadius: '12px', border: '2px solid rgba(255,255,255,0.1)', backgroundColor: 'rgba(15, 23, 42, 0.6)', color: 'white', marginBottom: '2.5rem', letterSpacing: '8px', outline: 'none', transition: 'border-color 0.3s' }}
-            onFocus={(e) => e.target.style.borderColor = '#38bdf8'}
-            onBlur={(e) => e.target.style.borderColor = 'rgba(255,255,255,0.1)'}
-            autoFocus
+            onFocus={(e) => e.target.style.borderColor = '#38bdf8'} onBlur={(e) => e.target.style.borderColor = 'rgba(255,255,255,0.1)'} autoFocus
           />
           <br />
           <button type="submit" style={{ padding: '16px 40px', background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)', color: 'white', border: 'none', borderRadius: '12px', fontSize: '1.2rem', cursor: 'pointer', fontWeight: 'bold', width: '100%', boxShadow: '0 4px 15px rgba(37, 99, 235, 0.3)', transition: 'transform 0.1s' }} onMouseDown={(e) => e.target.style.transform = 'scale(0.98)'} onMouseUp={(e) => e.target.style.transform = 'scale(1)'}>
@@ -237,7 +298,6 @@ export default function Admin() {
   // -----------------------------------------------------
   return (
     <div style={{ padding: '2rem', fontFamily: 'system-ui, sans-serif', background: '#0f172a', minHeight: '100vh' }}>
-      
       <header style={{ textAlign: 'center', marginBottom: '3rem', marginTop: '1rem' }}>
         <h1 style={{ color: '#f8fafc', fontSize: '2.5rem', margin: '0 0 10px 0', fontWeight: '800' }}>Panel de Administración</h1>
         <p style={{ color: '#94a3b8', fontSize: '1.2rem', margin: 0, fontWeight: '500' }}>Gestión avanzada de salas y turnos</p>
@@ -246,17 +306,12 @@ export default function Admin() {
       {/* Creador de Salas */}
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '15px', marginBottom: '4rem', padding: '1.5rem', backgroundColor: '#1e293b', borderRadius: '16px', maxWidth: '700px', margin: '0 auto 4rem auto', boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.5)', border: '1px solid #334155' }}>
         <input 
-          type="text" 
-          placeholder="Nombre de la nueva sala (Ej: Consulta 3)..." 
-          value={nuevaConsulta}
-          onChange={(e) => setNuevaConsulta(e.target.value)}
+          type="text" placeholder="Nombre de la nueva sala (Ej: Consulta 3)..." value={nuevaConsulta} onChange={(e) => setNuevaConsulta(e.target.value)}
           style={{ flex: 1, padding: '15px 20px', fontSize: '1.1rem', borderRadius: '10px', border: '1px solid #475569', outline: 'none', transition: 'border-color 0.2s', backgroundColor: '#0f172a', color: '#e2e8f0' }}
-          onFocus={(e) => e.target.style.borderColor = '#38bdf8'}
-          onBlur={(e) => e.target.style.borderColor = '#475569'}
+          onFocus={(e) => e.target.style.borderColor = '#38bdf8'} onBlur={(e) => e.target.style.borderColor = '#475569'}
         />
         <button 
-          onClick={crearNuevaConsulta}
-          disabled={creandoCola || !nuevaConsulta.trim()}
+          onClick={crearNuevaConsulta} disabled={creandoCola || !nuevaConsulta.trim()}
           style={{ padding: '15px 30px', fontSize: '1.1rem', fontWeight: 'bold', backgroundColor: (creandoCola || !nuevaConsulta.trim()) ? '#334155' : '#38bdf8', color: (creandoCola || !nuevaConsulta.trim()) ? '#64748b' : '#0f172a', border: 'none', borderRadius: '10px', cursor: (creandoCola || !nuevaConsulta.trim()) ? 'not-allowed' : 'pointer', transition: 'background-color 0.2s' }}
         >
           {creandoCola ? 'Creando...' : '+ Añadir Sala'}
@@ -272,11 +327,9 @@ export default function Admin() {
           
           return (
             <div key={sala.id} style={{ backgroundColor: '#1e293b', borderRadius: '20px', padding: '2rem', boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.4)', display: 'flex', flexDirection: 'column', border: '1px solid #334155', position: 'relative', overflow: 'hidden' }}>
-              
-              {/* Línea superior decorativa */}
               <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '4px', background: enEspera > 0 ? 'linear-gradient(90deg, #38bdf8, #34d399)' : '#475569' }} />
 
-              {/* Cabecera de la Tarjeta */}
+              {/* Cabecera */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', paddingBottom: '1rem', borderBottom: '1px solid #334155' }}>
                 <h2 style={{ fontSize: '1.5rem', color: '#f8fafc', margin: 0, fontWeight: '700' }}>{sala.nombre}</h2>
                 <button onClick={() => eliminarCola(sala.id, sala.nombre)} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontWeight: '600', fontSize: '0.9rem', padding: '5px 10px', borderRadius: '6px', transition: 'all 0.2s' }} onMouseOver={(e) => { e.target.style.backgroundColor = 'rgba(239, 68, 68, 0.1)'; e.target.style.color = '#ef4444'; }} onMouseOut={(e) => { e.target.style.backgroundColor = 'transparent'; e.target.style.color = '#64748b'; }}>
@@ -285,22 +338,35 @@ export default function Admin() {
               </div>
 
               {/* Indicador de Espera */}
-              <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+              <div style={{ textAlign: 'center', marginBottom: '0.5rem' }}>
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', backgroundColor: enEspera > 0 ? 'rgba(56, 189, 248, 0.1)' : '#0f172a', color: enEspera > 0 ? '#7dd3fc' : '#64748b', padding: '8px 20px', borderRadius: '30px', fontSize: '0.95rem', fontWeight: '600', border: `1px solid ${enEspera > 0 ? 'rgba(56, 189, 248, 0.2)' : '#334155'}` }}>
                   <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: enEspera > 0 ? '#38bdf8' : '#475569', animation: enEspera > 0 ? 'pulse 2s infinite' : 'none' }}></span>
                   Pacientes en espera: {enEspera}
                 </div>
               </div>
 
+              {/* NUEVO: Botón Imprimir Ticket Manual */}
+              <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+                <button 
+                  onClick={() => generarTurnoManual(sala.id, sala.nombre)}
+                  disabled={estaCargando}
+                  style={{ background: 'none', border: '1px dashed #475569', color: '#94a3b8', padding: '6px 15px', borderRadius: '8px', fontSize: '0.85rem', cursor: estaCargando ? 'wait' : 'pointer', transition: 'all 0.2s' }}
+                  onMouseOver={(e) => { !estaCargando && (e.target.style.backgroundColor = 'rgba(248, 250, 252, 0.05)', e.target.style.color = '#e2e8f0', e.target.style.border = '1px dashed #94a3b8') }}
+                  onMouseOut={(e) => { !estaCargando && (e.target.style.backgroundColor = 'transparent', e.target.style.color = '#94a3b8', e.target.style.border = '1px dashed #475569') }}
+                >
+                  🖨️ Imprimir turno papel
+                </button>
+              </div>
+
               {/* Turno Actual */}
-              <div style={{ textAlign: 'center', margin: '1.5rem 0 2rem 0', padding: '1.5rem', backgroundColor: '#0f172a', borderRadius: '16px', border: '1px dashed #334155' }}>
+              <div style={{ textAlign: 'center', margin: '0 0 2rem 0', padding: '1.5rem', backgroundColor: '#0f172a', borderRadius: '16px', border: '1px dashed #334155' }}>
                 <p style={{ margin: '0 0 10px 0', color: '#94a3b8', fontSize: '0.95rem', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '1px' }}>En consulta ahora</p>
                 <div style={{ fontSize: '4.5rem', fontWeight: '800', color: turno ? '#34d399' : '#475569', letterSpacing: '2px', lineHeight: '1', textShadow: turno ? '0 0 15px rgba(52, 211, 153, 0.2)' : 'none' }}>
                   {turno ? turno.numero : '-'}
                 </div>
               </div>
 
-              {/* Botones de Acción Secundaria (Rellamar / Descartar) */}
+              {/* Botones Secundarios */}
               <div style={{ display: 'flex', gap: '12px', marginBottom: '1.5rem', minHeight: '45px' }}>
                 {turno && (
                   <>
@@ -322,7 +388,7 @@ export default function Admin() {
                 )}
               </div>
 
-              {/* Botón Principal (Llamar Siguiente) */}
+              {/* Botón Principal */}
               <button 
                 onClick={() => llamarSiguiente(sala.id)}
                 disabled={estaCargando || enEspera === 0}
