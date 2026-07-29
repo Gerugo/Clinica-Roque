@@ -135,6 +135,32 @@ export default function Recepcion() {
     setCargando(false)
   }
 
+  // NUEVA FUNCIÓN: Dispara una notificación local de prueba
+  const probarNotificacion = async () => {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      alert('Su dispositivo o navegador no soporta notificaciones web.');
+      return;
+    }
+
+    if (Notification.permission !== 'granted') {
+      alert('Debe permitir las notificaciones al navegador para poder recibir el aviso.');
+      return;
+    }
+
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      registration.showNotification('🔔 Prueba de aviso', {
+        body: 'Si su móvil ha vibrado y sonado, ¡todo está configurado correctamente!',
+        vibrate: [300, 100, 300, 100, 300],
+        requireInteraction: true,
+        tag: 'prueba-alerta'
+      });
+    } catch (error) {
+      console.error('Error al lanzar la prueba:', error);
+    }
+  };
+
+
   // PANTALLA: TURNO LLAMADO
   if (miTurno && estadoTurno === 'llamado') {
     return (
@@ -160,12 +186,28 @@ export default function Recepcion() {
         <h2 style={{ color: '#64748b', fontSize: '1.5rem' }}>Su turno para {miTurno.sala} es:</h2>
         <div style={{ fontSize: '6rem', fontWeight: 'bold', color: '#0ea5e9', margin: '2rem 0', letterSpacing: '5px' }}>{miTurno.numero}</div>
         
-        <div style={{ backgroundColor: '#e0f2fe', padding: '15px', borderRadius: '10px', marginBottom: '2rem' }}>
+        <div style={{ backgroundColor: '#e0f2fe', padding: '15px', borderRadius: '10px', marginBottom: '1.5rem' }}>
           <p style={{ color: '#0284c7', fontSize: '1.1rem', margin: '0 0 10px 0', fontWeight: 'bold' }}>
             🔔 Notificaciones activadas
           </p>
           <p style={{ color: '#0369a1', fontSize: '1rem', margin: 0 }}>
             Puede bloquear su teléfono si lo desea. Le enviaremos un aviso cuando el médico le llame.
+          </p>
+        </div>
+
+        {/* NUEVO BLOQUE: Botón de prueba de alerta */}
+        <div style={{ marginBottom: '2rem', padding: '1.5rem', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', textAlign: 'center', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
+          <h3 style={{ fontSize: '1.1rem', color: '#334155', marginTop: 0, marginBottom: '1rem' }}>
+            ¿Quiere asegurarse de que le avisaremos?
+          </h3>
+          <button 
+            onClick={probarNotificacion}
+            style={{ padding: '10px 20px', backgroundColor: '#3b82f6', color: 'white', border: 'none', borderRadius: '8px', fontSize: '1rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', margin: '0 auto' }}
+          >
+            <span>🔔</span> Probar alerta
+          </button>
+          <p style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '1rem', marginBottom: 0, lineHeight: '1.4' }}>
+            Pulse el botón y bloquee la pantalla. Si no escucha sonido ni vibración, revise que su teléfono no esté en modo <b>Silencio</b> o verifique los permisos de su navegador (En iPhone recuerde "Añadir a la pantalla de inicio").
           </p>
         </div>
 

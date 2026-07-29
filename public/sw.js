@@ -17,6 +17,8 @@ self.addEventListener('push', (event) => {
     vibrate: [300, 100, 300, 100, 300], // Patrón de vibración
     tag: 'turno-alerta', // Evita que se acumulen notificaciones duplicadas
     renotify: true,
+    requireInteraction: true, // <-- NUEVO: Obliga a que el paciente interactúe para que desaparezca
+    silent: false,            // <-- NUEVO: Pide explícitamente al OS que no la silencie
     data: {
       url: self.location.origin
     }
