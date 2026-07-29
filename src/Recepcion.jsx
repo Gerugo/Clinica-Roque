@@ -1,12 +1,28 @@
 import { useState, useEffect } from 'react'
 import { supabase } from './supabase.js'
 
+// Tu Clave Pública de VAPID Keys
+const PUBLIC_VAPID_KEY = 'BLwFdwnK3Qh0TUVGdSu0uSIJltf6pMpybCqagPIzWiTL4ZSlQjgeUnIFlqXHM3vnCemBDcCgmd_uTICoNhIN2gQ';
+
+// Función auxiliar necesaria para convertir la clave VAPID al formato que exige el navegador
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
+
 export default function Recepcion() {
   const [salas, setSalas] = useState([])
   const [miTurno, setMiTurno] = useState(null)
   const [estadoTurno, setEstadoTurno] = useState('espera')
   const [cargando, setCargando] = useState(false)
 
+  // Cargar salas al iniciar
   useEffect(() => {
     const obtenerSalas = async () => {
       const { data } = await supabase.from('colas').select('*').eq('activa', true).order('nombre', { ascending: true })
@@ -15,6 +31,7 @@ export default function Recepcion() {
     obtenerSalas()
   }, [])
 
+  // Suscripción Realtime por si el paciente mantiene la pantalla abierta
   useEffect(() => {
     if (!miTurno) return
     const canalPaciente = supabase
@@ -32,6 +49,26 @@ export default function Recepcion() {
     return () => supabase.removeChannel(canalPaciente)
   }, [miTurno])
 
+  // Wake Lock API para mantener la pantalla encendida automáticamente
+  useEffect(() => {
+    let wakeLock = null;
+    const solicitarPantallaEncendida = async () => {
+      try {
+        if ('wakeLock' in navigator && estadoTurno === 'espera') {
+          wakeLock = await navigator.wakeLock.request('screen');
+        }
+      } catch (err) {
+        console.log(`Wake Lock no activo: ${err.message}`);
+      }
+    };
+
+    if (estadoTurno === 'espera') solicitarPantallaEncendida();
+
+    return () => {
+      if (wakeLock !== null) wakeLock.release();
+    };
+  }, [estadoTurno]);
+
   const generarCodigo = () => {
     const caracteres = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
     let codigo = ''
@@ -39,11 +76,55 @@ export default function Recepcion() {
     return codigo
   }
 
+  // Registra el Service Worker y crea el ticket de notificación
+  const obtenerSuscripcionPush = async () => {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      console.log('Las notificaciones Push no son soportadas en este navegador.');
+      return null;
+    }
+
+    try {
+      // 1. Pedir permiso al usuario
+      const permiso = await Notification.requestPermission();
+      if (permiso !== 'granted') {
+        console.log('Permiso de notificaciones denegado por el paciente.');
+        return null;
+      }
+
+      // 2. Registrar Service Worker
+      const registro = await navigator.serviceWorker.register('/sw.js');
+      await navigator.serviceWorker.ready;
+
+      // 3. Suscribir al servidor de Push usando tu Clave Pública
+      const suscripcion = await registro.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(PUBLIC_VAPID_KEY)
+      });
+
+      return suscripcion.toJSON();
+    } catch (error) {
+      console.error('Error al configurar Web Push:', error);
+      return null;
+    }
+  }
+
   const pedirTurno = async (sala) => {
     setCargando(true)
     const nuevoCodigo = generarCodigo()
+    
+    // Intentamos obtener los datos de push (si el usuario acepta)
+    const datosPush = await obtenerSuscripcionPush();
+
+    // Guardamos en Supabase el turno junto con el ticket de notificaciones
     const { data, error } = await supabase
-      .from('turnos').insert([{ cola_id: sala.id, numero: nuevoCodigo, estado: 'espera' }]).select()
+      .from('turnos')
+      .insert([{ 
+        cola_id: sala.id, 
+        numero: nuevoCodigo, 
+        estado: 'espera',
+        suscripcion_push: datosPush 
+      }])
+      .select()
 
     if (!error && data && data.length > 0) {
       setMiTurno({ id: data[0].id, numero: nuevoCodigo, sala: sala.nombre })
@@ -54,6 +135,7 @@ export default function Recepcion() {
     setCargando(false)
   }
 
+  // PANTALLA: TURNO LLAMADO
   if (miTurno && estadoTurno === 'llamado') {
     return (
       <div style={{ padding: '2rem', textAlign: 'center', fontFamily: 'system-ui, sans-serif', minHeight: '100vh', backgroundColor: '#22c55e', color: 'white', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
@@ -71,14 +153,22 @@ export default function Recepcion() {
     )
   }
 
+  // PANTALLA: EN ESPERA
   if (miTurno && estadoTurno === 'espera') {
     return (
       <div style={{ padding: '2rem', textAlign: 'center', fontFamily: 'system-ui, sans-serif', minHeight: '100vh', backgroundColor: '#f8fafc', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
         <h2 style={{ color: '#64748b', fontSize: '1.5rem' }}>Su turno para {miTurno.sala} es:</h2>
         <div style={{ fontSize: '6rem', fontWeight: 'bold', color: '#0ea5e9', margin: '2rem 0', letterSpacing: '5px' }}>{miTurno.numero}</div>
-        <p style={{ color: '#334155', fontSize: '1.2rem', padding: '0 20px', marginBottom: '2rem' }}>
-          Por favor, tome asiento. Su móvil le avisará cuando sea su turno.
-        </p>
+        
+        <div style={{ backgroundColor: '#e0f2fe', padding: '15px', borderRadius: '10px', marginBottom: '2rem' }}>
+          <p style={{ color: '#0284c7', fontSize: '1.1rem', margin: '0 0 10px 0', fontWeight: 'bold' }}>
+            🔔 Notificaciones activadas
+          </p>
+          <p style={{ color: '#0369a1', fontSize: '1rem', margin: 0 }}>
+            Puede bloquear su teléfono si lo desea. Le enviaremos un aviso cuando el médico le llame.
+          </p>
+        </div>
+
         <div style={{ display: 'flex', justifyContent: 'center' }}>
            <div style={{ width: '40px', height: '40px', border: '4px solid #cbd5e1', borderTop: '4px solid #0ea5e9', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
         </div>
@@ -87,6 +177,7 @@ export default function Recepcion() {
     )
   }
 
+  // PANTALLA: SELECCIÓN DE SALA
   return (
     <div style={{ padding: '1.5rem', fontFamily: 'system-ui, sans-serif', backgroundColor: '#f1f5f9', minHeight: '100vh' }}>
       <header style={{ textAlign: 'center', marginBottom: '3rem', marginTop: '2rem' }}>
