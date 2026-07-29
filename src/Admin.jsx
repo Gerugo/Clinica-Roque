@@ -8,7 +8,7 @@ export default function Admin() {
 
   // Estados de la Aplicación
   const [colas, setColas] = useState([])
-  const [turnoActual, setTurnoActual] = useState({}) // Guarda el objeto turno completo { id, numero }
+  const [turnoActual, setTurnoActual] = useState({}) // Guarda el objeto turno completo { id, numero, suscripcion_push... }
   const [esperaPorSala, setEsperaPorSala] = useState({}) // Contador de pacientes esperando
   const [nuevaConsulta, setNuevaConsulta] = useState('')
   const [creandoCola, setCreandoCola] = useState(false)
@@ -87,7 +87,7 @@ export default function Admin() {
   // Lógica de Seguridad
   const verificarPin = (e) => {
     e.preventDefault()
-    if (pin === '1234') { // <-- Puedes cambiar este PIN de seguridad aquí
+    if (pin === '1234') { 
       setAutenticado(true)
     } else {
       alert('PIN incorrecto. Acceso denegado.')
@@ -113,6 +113,23 @@ export default function Admin() {
     if (!confirmacion) return
     const { error } = await supabase.from('colas').update({ activa: false }).eq('id', salaId)
     if (!error) setColas(colas.filter(c => c.id !== salaId))
+  }
+
+  // =========================================================
+  // NUEVO: Función para invocar el servidor Push de Supabase
+  // =========================================================
+  const dispararPush = async (suscripcion, nombreSala, numero) => {
+    try {
+      await supabase.functions.invoke('enviar-alerta', {
+        body: {
+          suscripcion: suscripcion,
+          sala: nombreSala,
+          numero: numero
+        }
+      })
+    } catch (error) {
+      console.error("Error al enviar la notificación Push:", error)
+    }
   }
 
   // Lógica Principal: Llamar al siguiente de la cola
@@ -142,25 +159,38 @@ export default function Admin() {
     if (!errorUpdate) {
       setTurnoActual(prev => ({ ...prev, [salaId]: turnoALlamar }))
       setEsperaPorSala(prev => ({ ...prev, [salaId]: Math.max(0, (prev[salaId] || 1) - 1) }))
+      
+      // NUEVO: Disparamos el Push si el paciente aceptó notificaciones
+      if (turnoALlamar.suscripcion_push) {
+        const sala = colas.find(c => c.id === salaId)
+        dispararPush(turnoALlamar.suscripcion_push, sala.nombre, turnoALlamar.numero)
+      }
+
     } else {
       alert('Error al llamar al paciente.')
     }
     setCargandoCola(null)
   }
 
-  // NUEVA LÓGICA: Volver a hacer sonar la pantalla para el paciente actual
+  // Volver a hacer sonar la pantalla / Push para el paciente actual
   const reLlamar = async (salaId) => {
     const turno = turnoActual[salaId]
     if (!turno) return
     setCargandoCola(salaId)
     
-    // Forzamos un evento UPDATE en Supabase para que la pantalla y el móvil lo detecten
+    // Forzamos un evento UPDATE en Supabase
     await supabase.from('turnos').update({ estado: 'llamado' }).eq('id', turno.id)
+    
+    // NUEVO: Disparamos el Push de nuevo al re-llamar
+    if (turno.suscripcion_push) {
+      const sala = colas.find(c => c.id === salaId)
+      dispararPush(turno.suscripcion_push, sala.nombre, turno.numero)
+    }
     
     setCargandoCola(null)
   }
 
-  // NUEVA LÓGICA: Marcar al paciente como no presentado / finalizado
+  // Marcar al paciente como no presentado / finalizado
   const descartarTurno = async (salaId) => {
     const turno = turnoActual[salaId]
     if (!turno) return
