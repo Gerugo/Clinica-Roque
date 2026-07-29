@@ -16,30 +16,46 @@ function urlBase64ToUint8Array(base64String) {
 
 export default function Recepcion() {
   const [salas, setSalas] = useState([])
-  const [misTurnos, setMisTurnos] = useState([]) // NUEVO: Ahora guardamos un ARRAY de turnos
+  const [misTurnos, setMisTurnos] = useState([]) 
   const [cargando, setCargando] = useState(false)
 
-  // 1. Carga inicial de datos y recuperación de turnos guardados (localStorage)
+  // Función para emitir un pitido suave en el móvil del paciente
+  const reproducirSonidoMovil = () => {
+    try {
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)()
+      const osc = audioCtx.createOscillator()
+      const gain = audioCtx.createGain()
+      osc.type = 'sine'
+      osc.frequency.setValueAtTime(880, audioCtx.currentTime)
+      gain.gain.setValueAtTime(0.1, audioCtx.currentTime) // Volumen bajo y elegante
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5)
+      osc.connect(gain)
+      gain.connect(audioCtx.destination)
+      osc.start()
+      osc.stop(audioCtx.currentTime + 0.5)
+    } catch (e) {
+      console.log('Audio no soportado en este navegador')
+    }
+  }
+
+  // 1. Carga inicial de datos y recuperación de turnos
   useEffect(() => {
     const obtenerDatos = async () => {
-      // Cargar salas
       const { data: salasData } = await supabase.from('colas').select('*').eq('activa', true).order('nombre', { ascending: true })
       if (salasData) setSalas(salasData)
 
-      // Cargar turnos del localStorage y verificar su estado real en la Base de Datos
       const turnosGuardados = JSON.parse(localStorage.getItem('turnos_paciente') || '[]')
       if (turnosGuardados.length > 0) {
         const ids = turnosGuardados.map(t => t.id)
         const { data: turnosBD } = await supabase.from('turnos').select('id, estado').in('id', ids)
         
         if (turnosBD) {
-          // Filtramos para mantener solo los que siguen en espera o llamados (eliminamos los descartados/finalizados)
           const turnosValidos = turnosGuardados.filter(t => {
             const dbT = turnosBD.find(db => db.id === t.id)
             return dbT && (dbT.estado === 'espera' || dbT.estado === 'llamado')
           }).map(t => {
             const dbT = turnosBD.find(db => db.id === t.id)
-            return { ...t, estado: dbT.estado } // Actualizamos el estado real
+            return { ...t, estado: dbT.estado } 
           })
           setMisTurnos(turnosValidos)
         } else {
@@ -50,15 +66,13 @@ export default function Recepcion() {
     obtenerDatos()
   }, [])
 
-  // 2. Guardar en localStorage cada vez que la lista de turnos cambia
+  // 2. Guardar en localStorage cada vez que la lista cambia
   useEffect(() => {
     localStorage.setItem('turnos_paciente', JSON.stringify(misTurnos))
   }, [misTurnos])
 
-  // 3. Suscripción Realtime para actualizar CUALQUIERA de los turnos del paciente
+  // 3. Suscripción Realtime (CORREGIDA: Ahora es permanente y no sufre micro-cortes)
   useEffect(() => {
-    if (misTurnos.length === 0) return
-
     const canalPaciente = supabase
       .channel('paciente-updates')
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'turnos' }, (payload) => {
@@ -66,30 +80,30 @@ export default function Recepcion() {
         
         setMisTurnos(prevTurnos => {
           const index = prevTurnos.findIndex(t => t.id === turnoActualizado.id)
-          if (index === -1) return prevTurnos // Si no es nuestro turno, lo ignoramos
+          if (index === -1) return prevTurnos 
 
-          // Si el médico descarta el turno, lo borramos de la pantalla del paciente
           if (turnoActualizado.estado === 'descartado') {
             return prevTurnos.filter(t => t.id !== turnoActualizado.id)
           }
 
           const nuevosTurnos = [...prevTurnos]
-          nuevosTurnos[index] = { ...nuevosTurnos[index], estado: turnoActualizado.estado }
           
-          // Vibrar si nos llaman (Solo si antes estábamos en espera)
+          // Detectamos si acaba de ser llamado
           if (turnoActualizado.estado === 'llamado' && prevTurnos[index].estado !== 'llamado') {
             if ("vibrate" in navigator) navigator.vibrate([300, 100, 300, 100, 300])
+            reproducirSonidoMovil() // Disparamos el sonido
           }
           
+          nuevosTurnos[index] = { ...nuevosTurnos[index], estado: turnoActualizado.estado }
           return nuevosTurnos
         })
       })
       .subscribe()
 
     return () => supabase.removeChannel(canalPaciente)
-  }, [misTurnos.length]) // Nos suscribimos basándonos en la cantidad de turnos
+  }, []) // <-- ARRAY VACÍO: La conexión nunca se reinicia al añadir más turnos
 
-  // 4. Wake Lock API: Mantiene la pantalla encendida si hay algún turno en espera
+  // 4. Wake Lock API
   useEffect(() => {
     let wakeLock = null;
     const solicitarPantallaEncendida = async () => {
@@ -99,7 +113,7 @@ export default function Recepcion() {
           wakeLock = await navigator.wakeLock.request('screen');
         }
       } catch (err) {
-        console.log(`Wake Lock no activo: ${err.message}`);
+        console.log(`Wake Lock no activo`);
       }
     };
     solicitarPantallaEncendida();
@@ -134,7 +148,6 @@ export default function Recepcion() {
   }
 
   const pedirTurno = async (sala) => {
-    // PROTECCIÓN EXTRA: Por si el botón no se deshabilitó correctamente
     if (misTurnos.some(t => t.cola_id === sala.id)) {
       alert(`Ya tienes un turno activo para ${sala.nombre}`);
       return;
@@ -151,7 +164,7 @@ export default function Recepcion() {
 
     if (!error && data && data.length > 0) {
       const nuevoTurno = { id: data[0].id, numero: nuevoCodigo, sala: sala.nombre, cola_id: sala.id, estado: 'espera' }
-      setMisTurnos([...misTurnos, nuevoTurno]) // Añadimos el nuevo turno al array
+      setMisTurnos([...misTurnos, nuevoTurno])
     } else {
       alert('Error al solicitar el turno.')
     }
@@ -179,7 +192,7 @@ export default function Recepcion() {
   const turnoLlamado = misTurnos.find(t => t.estado === 'llamado')
   const turnosEnEspera = misTurnos.filter(t => t.estado === 'espera')
 
-  // PANTALLA 1: TURNO LLAMADO (Tiene prioridad absoluta y ocupa toda la pantalla)
+  // PANTALLA 1: TURNO LLAMADO
   if (turnoLlamado) {
     return (
       <div style={{ padding: '2rem', textAlign: 'center', fontFamily: 'system-ui, sans-serif', minHeight: '100vh', background: 'linear-gradient(135deg, #10b981 0%, #047857 100%)', color: 'white', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
@@ -191,7 +204,6 @@ export default function Recepcion() {
           <div style={{ fontSize: '1.5rem', opacity: '0.9' }}>Su código era: <span style={{fontWeight: 'bold'}}>{turnoLlamado.numero}</span></div>
         </div>
         
-        {/* Al finalizar, solo borramos ESTE turno en concreto del array */}
         <button onClick={() => setMisTurnos(prev => prev.filter(t => t.id !== turnoLlamado.id))} style={{ marginTop: '4rem', padding: '15px 30px', fontSize: '1.2rem', backgroundColor: 'rgba(255,255,255,0.1)', border: '2px solid rgba(255,255,255,0.5)', color: 'white', borderRadius: '10px', cursor: 'pointer', transition: 'background-color 0.3s' }}>
           Entendido / Finalizar
         </button>
@@ -199,7 +211,7 @@ export default function Recepcion() {
     )
   }
 
-  // PANTALLA 2: DASHBOARD DEL PACIENTE (Combina Espera + Selección)
+  // PANTALLA 2: DASHBOARD DEL PACIENTE
   return (
     <div style={{ padding: '1.5rem', fontFamily: 'system-ui, sans-serif', background: 'linear-gradient(to bottom right, #ffffff 0%, #f1f5f9 100%)', minHeight: '100vh' }}>
       
@@ -207,7 +219,6 @@ export default function Recepcion() {
         <h1 style={{ color: '#0f172a', fontSize: '2rem', margin: '0 0 5px 0' }}>Clínica Roque</h1>
       </header>
 
-      {/* SECCIÓN A: TURNOS ACTIVOS (Solo se muestra si el paciente tiene turnos pedidos) */}
       {turnosEnEspera.length > 0 && (
         <div style={{ marginBottom: '3rem', maxWidth: '400px', margin: '0 auto 3rem auto' }}>
           <h2 style={{ textAlign: 'center', color: '#64748b', fontSize: '1.2rem', marginBottom: '1rem' }}>Sus turnos actuales:</h2>
@@ -226,7 +237,6 @@ export default function Recepcion() {
 
           <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
 
-          {/* Bloque de prueba de notificación */}
           <div style={{ marginTop: '1.5rem', padding: '1.5rem', backgroundColor: 'white', borderRadius: '12px', border: '1px solid #e2e8f0', textAlign: 'center', boxShadow: '0 4px 6px rgba(0,0,0,0.02)' }}>
             <h3 style={{ fontSize: '1rem', color: '#334155', marginTop: 0, marginBottom: '1rem' }}>¿Quiere asegurarse de que le avisaremos?</h3>
             <button onClick={probarNotificacion} style={{ padding: '8px 16px', background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '0.95rem', fontWeight: 'bold', cursor: 'pointer' }}>
@@ -236,7 +246,6 @@ export default function Recepcion() {
         </div>
       )}
 
-      {/* SECCIÓN B: PEDIR NUEVO TURNO */}
       <div style={{ maxWidth: '400px', margin: '0 auto' }}>
         <h2 style={{ textAlign: 'center', color: '#0f172a', marginBottom: '1.5rem', fontSize: '1.3rem' }}>
           {turnosEnEspera.length > 0 ? '¿Necesita cita para otra consulta?' : 'Seleccione la consulta:'}
@@ -244,7 +253,7 @@ export default function Recepcion() {
         
         <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
           {salas.map(sala => {
-            const yaTieneTurno = misTurnos.some(t => t.cola_id === sala.id) // Verifica si ya está en esta cola
+            const yaTieneTurno = misTurnos.some(t => t.cola_id === sala.id) 
             
             return (
               <button 
@@ -266,7 +275,6 @@ export default function Recepcion() {
                 }}
               >
                 {sala.nombre}
-                {/* Mensaje rojo si ya ha pulsado este botón */}
                 {yaTieneTurno && (
                   <span style={{ display: 'block', fontSize: '0.85rem', color: '#ef4444', marginTop: '8px', fontWeight: 'normal' }}>
                     Turno ya solicitado
@@ -277,7 +285,6 @@ export default function Recepcion() {
           })}
         </div>
       </div>
-
     </div>
   )
 }
