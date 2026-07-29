@@ -116,7 +116,7 @@ export default function Admin() {
   }
 
   // =========================================================
-  // NUEVO: Función para invocar el servidor Push de Supabase
+  // Función para invocar el servidor Push de Supabase
   // =========================================================
   const dispararPush = async (suscripcion, nombreSala, numero) => {
     try {
@@ -160,7 +160,7 @@ export default function Admin() {
       setTurnoActual(prev => ({ ...prev, [salaId]: turnoALlamar }))
       setEsperaPorSala(prev => ({ ...prev, [salaId]: Math.max(0, (prev[salaId] || 1) - 1) }))
       
-      // NUEVO: Disparamos el Push si el paciente aceptó notificaciones
+      // Disparamos el Push si el paciente aceptó notificaciones
       if (turnoALlamar.suscripcion_push) {
         const sala = colas.find(c => c.id === salaId)
         dispararPush(turnoALlamar.suscripcion_push, sala.nombre, turnoALlamar.numero)
@@ -181,7 +181,7 @@ export default function Admin() {
     // Forzamos un evento UPDATE en Supabase
     await supabase.from('turnos').update({ estado: 'llamado' }).eq('id', turno.id)
     
-    // NUEVO: Disparamos el Push de nuevo al re-llamar
+    // Disparamos el Push de nuevo al re-llamar
     if (turno.suscripcion_push) {
       const sala = colas.find(c => c.id === salaId)
       dispararPush(turno.suscripcion_push, sala.nombre, turno.numero)
@@ -209,20 +209,25 @@ export default function Admin() {
   // -----------------------------------------------------
   if (!autenticado) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', backgroundColor: '#0f172a', fontFamily: 'system-ui' }}>
-        <form onSubmit={verificarPin} style={{ backgroundColor: '#1e293b', padding: '3rem', borderRadius: '15px', textAlign: 'center', boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}>
-          <h2 style={{ color: '#fff', marginBottom: '2rem' }}>Panel de Control Médico</h2>
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', fontFamily: 'system-ui, sans-serif' }}>
+        <form onSubmit={verificarPin} style={{ backgroundColor: 'rgba(255, 255, 255, 0.03)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.1)', padding: '4rem 3rem', borderRadius: '24px', textAlign: 'center', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)' }}>
+          <div style={{ marginBottom: '2rem' }}>
+            <span style={{ fontSize: '3rem' }}>🩺</span>
+          </div>
+          <h2 style={{ color: '#f8fafc', marginBottom: '2.5rem', fontWeight: '500', letterSpacing: '1px' }}>Acceso Médico</h2>
           <input 
             type="password" 
-            placeholder="PIN de acceso" 
+            placeholder="****" 
             value={pin} 
             onChange={(e) => setPin(e.target.value)}
-            style={{ padding: '15px', fontSize: '1.5rem', width: '200px', textAlign: 'center', borderRadius: '8px', border: 'none', marginBottom: '2rem', letterSpacing: '5px' }}
+            style={{ padding: '15px', fontSize: '2rem', width: '220px', textAlign: 'center', borderRadius: '12px', border: '2px solid rgba(255,255,255,0.2)', backgroundColor: 'rgba(0,0,0,0.2)', color: 'white', marginBottom: '2.5rem', letterSpacing: '8px', outline: 'none', transition: 'border-color 0.3s' }}
+            onFocus={(e) => e.target.style.borderColor = '#38bdf8'}
+            onBlur={(e) => e.target.style.borderColor = 'rgba(255,255,255,0.2)'}
             autoFocus
           />
           <br />
-          <button type="submit" style={{ padding: '15px 40px', backgroundColor: '#3b82f6', color: 'white', border: 'none', borderRadius: '8px', fontSize: '1.2rem', cursor: 'pointer', fontWeight: 'bold' }}>
-            Entrar
+          <button type="submit" style={{ padding: '16px 40px', background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)', color: 'white', border: 'none', borderRadius: '12px', fontSize: '1.2rem', cursor: 'pointer', fontWeight: 'bold', width: '100%', boxShadow: '0 4px 15px rgba(37, 99, 235, 0.4)', transition: 'transform 0.1s' }} onMouseDown={(e) => e.target.style.transform = 'scale(0.98)'} onMouseUp={(e) => e.target.style.transform = 'scale(1)'}>
+            Entrar al Panel
           </button>
         </form>
       </div>
@@ -233,77 +238,87 @@ export default function Admin() {
   // VISTA 2: DASHBOARD PRINCIPAL
   // -----------------------------------------------------
   return (
-    <div style={{ padding: '2rem', fontFamily: 'system-ui, sans-serif', backgroundColor: '#f1f5f9', minHeight: '100vh' }}>
+    <div style={{ padding: '2rem', fontFamily: 'system-ui, sans-serif', background: 'linear-gradient(to bottom right, #f8fafc 0%, #e2e8f0 100%)', minHeight: '100vh' }}>
       
-      <header style={{ textAlign: 'center', marginBottom: '3rem' }}>
-        <h1 style={{ color: '#0f172a', fontSize: '2.5rem', margin: '0 0 10px 0' }}>Panel de Administración</h1>
-        <p style={{ color: '#64748b', fontSize: '1.2rem', margin: 0 }}>Gestión avanzada de llamadas</p>
+      <header style={{ textAlign: 'center', marginBottom: '3rem', marginTop: '1rem' }}>
+        <h1 style={{ color: '#0f172a', fontSize: '2.5rem', margin: '0 0 10px 0', fontWeight: '800' }}>Panel de Administración</h1>
+        <p style={{ color: '#64748b', fontSize: '1.2rem', margin: 0, fontWeight: '500' }}>Gestión avanzada de salas y turnos</p>
       </header>
 
       {/* Creador de Salas */}
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '15px', marginBottom: '3rem', padding: '1.5rem', backgroundColor: '#fff', borderRadius: '12px', maxWidth: '600px', margin: '0 auto 3rem auto', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}>
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '15px', marginBottom: '4rem', padding: '1.5rem', backgroundColor: '#ffffff', borderRadius: '16px', maxWidth: '700px', margin: '0 auto 4rem auto', boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01)', border: '1px solid #f1f5f9' }}>
         <input 
           type="text" 
-          placeholder="Añadir nueva sala (Ej: Dr. López)..." 
+          placeholder="Nombre de la nueva sala (Ej: Consulta 3)..." 
           value={nuevaConsulta}
           onChange={(e) => setNuevaConsulta(e.target.value)}
-          style={{ flex: 1, padding: '12px 15px', fontSize: '1.1rem', borderRadius: '8px', border: '1px solid #cbd5e1' }}
+          style={{ flex: 1, padding: '15px 20px', fontSize: '1.1rem', borderRadius: '10px', border: '1px solid #cbd5e1', outline: 'none', transition: 'border-color 0.2s', backgroundColor: '#f8fafc' }}
+          onFocus={(e) => e.target.style.borderColor = '#94a3b8'}
+          onBlur={(e) => e.target.style.borderColor = '#cbd5e1'}
         />
         <button 
           onClick={crearNuevaConsulta}
           disabled={creandoCola || !nuevaConsulta.trim()}
-          style={{ padding: '12px 25px', fontSize: '1.1rem', fontWeight: 'bold', backgroundColor: (creandoCola || !nuevaConsulta.trim()) ? '#94a3b8' : '#3b82f6', color: 'white', border: 'none', borderRadius: '8px', cursor: (creandoCola || !nuevaConsulta.trim()) ? 'not-allowed' : 'pointer' }}
+          style={{ padding: '15px 30px', fontSize: '1.1rem', fontWeight: 'bold', backgroundColor: (creandoCola || !nuevaConsulta.trim()) ? '#cbd5e1' : '#0f172a', color: 'white', border: 'none', borderRadius: '10px', cursor: (creandoCola || !nuevaConsulta.trim()) ? 'not-allowed' : 'pointer', transition: 'background-color 0.2s' }}
         >
-          {creandoCola ? 'Creando...' : '+ Añadir'}
+          {creandoCola ? 'Creando...' : '+ Añadir Sala'}
         </button>
       </div>
 
       {/* Cuadrícula de Consultas */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '2rem', maxWidth: '1400px', margin: '0 auto' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '2.5rem', maxWidth: '1400px', margin: '0 auto' }}>
         {colas.map(sala => {
           const estaCargando = cargandoCola === sala.id
           const turno = turnoActual[sala.id]
           const enEspera = esperaPorSala[sala.id] || 0
           
           return (
-            <div key={sala.id} style={{ backgroundColor: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)', display: 'flex', flexDirection: 'column', border: '1px solid #e2e8f0' }}>
+            <div key={sala.id} style={{ backgroundColor: '#ffffff', borderRadius: '20px', padding: '2rem', boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01)', display: 'flex', flexDirection: 'column', border: '1px solid #f1f5f9', position: 'relative', overflow: 'hidden' }}>
               
+              {/* Línea superior decorativa */}
+              <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '4px', background: enEspera > 0 ? 'linear-gradient(90deg, #3b82f6, #2dd4bf)' : '#cbd5e1' }} />
+
               {/* Cabecera de la Tarjeta */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '2px solid #f1f5f9', paddingBottom: '1rem' }}>
-                <h2 style={{ fontSize: '1.4rem', color: '#1e293b', margin: 0 }}>{sala.nombre}</h2>
-                <button onClick={() => eliminarCola(sala.id, sala.nombre)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.9rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', paddingBottom: '1rem', borderBottom: '1px solid #f1f5f9' }}>
+                <h2 style={{ fontSize: '1.5rem', color: '#0f172a', margin: 0, fontWeight: '700' }}>{sala.nombre}</h2>
+                <button onClick={() => eliminarCola(sala.id, sala.nombre)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontWeight: '600', fontSize: '0.9rem', padding: '5px 10px', borderRadius: '6px', transition: 'all 0.2s' }} onMouseOver={(e) => { e.target.style.backgroundColor = '#fee2e2'; e.target.style.color = '#ef4444'; }} onMouseOut={(e) => { e.target.style.backgroundColor = 'transparent'; e.target.style.color = '#94a3b8'; }}>
                   Eliminar
                 </button>
               </div>
 
               {/* Indicador de Espera */}
-              <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
-                <span style={{ backgroundColor: enEspera > 0 ? '#fef08a' : '#e2e8f0', color: enEspera > 0 ? '#854d0e' : '#64748b', padding: '5px 15px', borderRadius: '20px', fontSize: '0.9rem', fontWeight: 'bold' }}>
-                  Pacientes esperando: {enEspera}
-                </span>
+              <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', backgroundColor: enEspera > 0 ? '#eff6ff' : '#f8fafc', color: enEspera > 0 ? '#1d4ed8' : '#64748b', padding: '8px 20px', borderRadius: '30px', fontSize: '0.95rem', fontWeight: '600', border: `1px solid ${enEspera > 0 ? '#bfdbfe' : '#e2e8f0'}` }}>
+                  <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: enEspera > 0 ? '#3b82f6' : '#cbd5e1', animation: enEspera > 0 ? 'pulse 2s infinite' : 'none' }}></span>
+                  Pacientes en espera: {enEspera}
+                </div>
               </div>
 
               {/* Turno Actual */}
-              <div style={{ textAlign: 'center', margin: '1rem 0' }}>
-                <p style={{ margin: 0, color: '#64748b', fontSize: '1rem' }}>En consulta ahora:</p>
-                <div style={{ fontSize: '4.5rem', fontWeight: 'bold', color: turno ? '#0f172a' : '#cbd5e1', letterSpacing: '3px', lineHeight: '1.2' }}>
+              <div style={{ textAlign: 'center', margin: '1.5rem 0 2rem 0', padding: '1.5rem', backgroundColor: '#f8fafc', borderRadius: '16px', border: '1px dashed #cbd5e1' }}>
+                <p style={{ margin: '0 0 10px 0', color: '#64748b', fontSize: '0.95rem', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '1px' }}>En consulta ahora</p>
+                <div style={{ fontSize: '4.5rem', fontWeight: '800', color: turno ? '#0f172a' : '#cbd5e1', letterSpacing: '2px', lineHeight: '1' }}>
                   {turno ? turno.numero : '-'}
                 </div>
               </div>
 
               {/* Botones de Acción Secundaria (Rellamar / Descartar) */}
-              <div style={{ display: 'flex', gap: '10px', marginBottom: '15px', minHeight: '40px' }}>
+              <div style={{ display: 'flex', gap: '12px', marginBottom: '1.5rem', minHeight: '45px' }}>
                 {turno && (
                   <>
                     <button 
                       onClick={() => reLlamar(sala.id)} disabled={estaCargando}
-                      style={{ flex: 1, padding: '10px', backgroundColor: '#e0f2fe', color: '#0369a1', border: 'none', borderRadius: '8px', cursor: estaCargando ? 'wait' : 'pointer', fontWeight: 'bold', fontSize: '0.95rem' }}>
-                      Re-llamar
+                      style={{ flex: 1, padding: '12px', backgroundColor: '#f0f9ff', color: '#0284c7', border: '1px solid #bae6fd', borderRadius: '10px', cursor: estaCargando ? 'wait' : 'pointer', fontWeight: '700', fontSize: '0.95rem', transition: 'background-color 0.2s' }}
+                      onMouseOver={(e) => !estaCargando && (e.target.style.backgroundColor = '#e0f2fe')} onMouseOut={(e) => !estaCargando && (e.target.style.backgroundColor = '#f0f9ff')}
+                    >
+                      🔔 Re-llamar
                     </button>
                     <button 
                       onClick={() => descartarTurno(sala.id)} disabled={estaCargando}
-                      style={{ flex: 1, padding: '10px', backgroundColor: '#fee2e2', color: '#b91c1c', border: 'none', borderRadius: '8px', cursor: estaCargando ? 'wait' : 'pointer', fontWeight: 'bold', fontSize: '0.95rem' }}>
-                      Descartar
+                      style={{ flex: 1, padding: '12px', backgroundColor: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '10px', cursor: estaCargando ? 'wait' : 'pointer', fontWeight: '700', fontSize: '0.95rem', transition: 'background-color 0.2s' }}
+                      onMouseOver={(e) => !estaCargando && (e.target.style.backgroundColor = '#fee2e2')} onMouseOut={(e) => !estaCargando && (e.target.style.backgroundColor = '#fef2f2')}
+                    >
+                      ✕ Descartar
                     </button>
                   </>
                 )}
@@ -313,14 +328,17 @@ export default function Admin() {
               <button 
                 onClick={() => llamarSiguiente(sala.id)}
                 disabled={estaCargando || enEspera === 0}
-                style={{ marginTop: 'auto', padding: '15px', width: '100%', cursor: (estaCargando || enEspera === 0) ? 'not-allowed' : 'pointer', backgroundColor: (estaCargando || enEspera === 0) ? '#a7f3d0' : '#22c55e', color: (estaCargando || enEspera === 0) ? '#064e3b' : 'white', border: 'none', borderRadius: '10px', fontSize: '1.2rem', fontWeight: 'bold', boxShadow: (estaCargando || enEspera === 0) ? 'none' : '0 4px 6px -1px rgba(34, 197, 94, 0.4)', transition: 'all 0.2s' }}
+                style={{ marginTop: 'auto', padding: '18px', width: '100%', cursor: (estaCargando || enEspera === 0) ? 'not-allowed' : 'pointer', background: (estaCargando || enEspera === 0) ? '#f1f5f9' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: (estaCargando || enEspera === 0) ? '#94a3b8' : 'white', border: 'none', borderRadius: '12px', fontSize: '1.15rem', fontWeight: 'bold', boxShadow: (estaCargando || enEspera === 0) ? 'none' : '0 10px 15px -3px rgba(16, 185, 129, 0.3)', transition: 'transform 0.1s, box-shadow 0.1s' }}
+                onMouseDown={(e) => { if(!estaCargando && enEspera > 0) e.target.style.transform = 'scale(0.98)' }} 
+                onMouseUp={(e) => { if(!estaCargando && enEspera > 0) e.target.style.transform = 'scale(1)' }}
               >
-                {estaCargando ? 'Cargando...' : 'Llamar Siguiente'}
+                {estaCargando ? 'Procesando...' : 'Llamar Siguiente'}
               </button>
             </div>
           )
         })}
       </div>
+      <style>{`@keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }`}</style>
     </div>
   )
 }

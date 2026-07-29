@@ -164,15 +164,15 @@ export default function Recepcion() {
   // PANTALLA: TURNO LLAMADO
   if (miTurno && estadoTurno === 'llamado') {
     return (
-      <div style={{ padding: '2rem', textAlign: 'center', fontFamily: 'system-ui, sans-serif', minHeight: '100vh', backgroundColor: '#22c55e', color: 'white', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
+      <div style={{ padding: '2rem', textAlign: 'center', fontFamily: 'system-ui, sans-serif', minHeight: '100vh', background: 'linear-gradient(135deg, #10b981 0%, #047857 100%)', color: 'white', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
         <style>{`@keyframes parpadeo { 0% { opacity: 1; transform: scale(1); } 50% { opacity: 0.8; transform: scale(1.05); } 100% { opacity: 1; transform: scale(1); } }`}</style>
         <div style={{ animation: 'parpadeo 1s infinite' }}>
-          <h1 style={{ fontSize: '3rem', margin: '0 0 1rem 0' }}>¡ES SU TURNO!</h1>
+          <h1 style={{ fontSize: '3rem', margin: '0 0 1rem 0', textShadow: '0 2px 4px rgba(0,0,0,0.2)' }}>¡ES SU TURNO!</h1>
           <h2 style={{ fontSize: '1.8rem', fontWeight: 'normal', margin: '0 0 2rem 0' }}>Diríjase a:</h2>
-          <div style={{ fontSize: '3rem', fontWeight: 'bold', backgroundColor: 'white', color: '#166534', padding: '15px 30px', borderRadius: '15px', marginBottom: '2rem' }}>{miTurno.sala}</div>
-          <div style={{ fontSize: '1.5rem' }}>Su código era: {miTurno.numero}</div>
+          <div style={{ fontSize: '3rem', fontWeight: 'bold', backgroundColor: 'white', color: '#064e3b', padding: '15px 30px', borderRadius: '15px', marginBottom: '2rem', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.3)' }}>{miTurno.sala}</div>
+          <div style={{ fontSize: '1.5rem', opacity: '0.9' }}>Su código era: <span style={{fontWeight: 'bold'}}>{miTurno.numero}</span></div>
         </div>
-        <button onClick={() => { setMiTurno(null); setEstadoTurno('espera'); }} style={{ marginTop: '4rem', padding: '15px 30px', fontSize: '1.2rem', backgroundColor: 'transparent', border: '2px solid white', color: 'white', borderRadius: '10px', cursor: 'pointer' }}>
+        <button onClick={() => { setMiTurno(null); setEstadoTurno('espera'); }} style={{ marginTop: '4rem', padding: '15px 30px', fontSize: '1.2rem', backgroundColor: 'rgba(255,255,255,0.1)', border: '2px solid rgba(255,255,255,0.5)', color: 'white', borderRadius: '10px', cursor: 'pointer', transition: 'background-color 0.3s' }}>
           Finalizar
         </button>
       </div>
@@ -182,11 +182,11 @@ export default function Recepcion() {
   // PANTALLA: EN ESPERA
   if (miTurno && estadoTurno === 'espera') {
     return (
-      <div style={{ padding: '2rem', textAlign: 'center', fontFamily: 'system-ui, sans-serif', minHeight: '100vh', backgroundColor: '#f8fafc', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+      <div style={{ padding: '2rem', textAlign: 'center', fontFamily: 'system-ui, sans-serif', minHeight: '100vh', background: 'radial-gradient(circle at top right, #f0f9ff 0%, #e0f2fe 50%, #f8fafc 100%)', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
         <h2 style={{ color: '#64748b', fontSize: '1.5rem' }}>Su turno para {miTurno.sala} es:</h2>
-        <div style={{ fontSize: '6rem', fontWeight: 'bold', color: '#0ea5e9', margin: '2rem 0', letterSpacing: '5px' }}>{miTurno.numero}</div>
+        <div style={{ fontSize: '6rem', fontWeight: 'bold', color: '#0284c7', margin: '2rem 0', letterSpacing: '5px', textShadow: '0 4px 6px rgba(2, 132, 199, 0.1)' }}>{miTurno.numero}</div>
         
-        <div style={{ backgroundColor: '#e0f2fe', padding: '15px', borderRadius: '10px', marginBottom: '1.5rem' }}>
+        <div style={{ backgroundColor: 'rgba(255,255,255,0.6)', backdropFilter: 'blur(10px)', padding: '15px', borderRadius: '12px', marginBottom: '1.5rem', border: '1px solid rgba(255,255,255,0.8)', boxShadow: '0 4px 6px rgba(0,0,0,0.02)' }}>
           <p style={{ color: '#0284c7', fontSize: '1.1rem', margin: '0 0 10px 0', fontWeight: 'bold' }}>
             🔔 Notificaciones activadas
           </p>
@@ -195,14 +195,14 @@ export default function Recepcion() {
           </p>
         </div>
 
-        {/* NUEVO BLOQUE: Botón de prueba de alerta */}
-        <div style={{ marginBottom: '2rem', padding: '1.5rem', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', textAlign: 'center', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
+        {/* BLOQUE: Botón de prueba de alerta */}
+        <div style={{ marginBottom: '2rem', padding: '1.5rem', backgroundColor: 'white', borderRadius: '12px', border: '1px solid #e2e8f0', textAlign: 'center', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.05)' }}>
           <h3 style={{ fontSize: '1.1rem', color: '#334155', marginTop: 0, marginBottom: '1rem' }}>
             ¿Quiere asegurarse de que le avisaremos?
           </h3>
           <button 
             onClick={probarNotificacion}
-            style={{ padding: '10px 20px', backgroundColor: '#3b82f6', color: 'white', border: 'none', borderRadius: '8px', fontSize: '1rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', margin: '0 auto' }}
+            style={{ padding: '10px 20px', background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '1rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', margin: '0 auto', boxShadow: '0 4px 6px rgba(59, 130, 246, 0.3)' }}
           >
             <span>🔔</span> Probar alerta
           </button>
@@ -221,14 +221,14 @@ export default function Recepcion() {
 
   // PANTALLA: SELECCIÓN DE SALA
   return (
-    <div style={{ padding: '1.5rem', fontFamily: 'system-ui, sans-serif', backgroundColor: '#f1f5f9', minHeight: '100vh' }}>
+    <div style={{ padding: '1.5rem', fontFamily: 'system-ui, sans-serif', background: 'linear-gradient(to bottom right, #ffffff 0%, #f1f5f9 100%)', minHeight: '100vh' }}>
       <header style={{ textAlign: 'center', marginBottom: '3rem', marginTop: '2rem' }}>
         <h1 style={{ color: '#0f172a', fontSize: '2rem', margin: '0 0 10px 0' }}>Bienvenido a Clínica Roque</h1>
         <p style={{ color: '#64748b', fontSize: '1.1rem', margin: 0 }}>Seleccione la consulta a la que desea acudir:</p>
       </header>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', maxWidth: '400px', margin: '0 auto' }}>
         {salas.map(sala => (
-          <button key={sala.id} onClick={() => pedirTurno(sala)} disabled={cargando} style={{ padding: '20px', backgroundColor: '#fff', border: '2px solid #e2e8f0', borderRadius: '12px', fontSize: '1.3rem', fontWeight: 'bold', color: '#334155', cursor: cargando ? 'wait' : 'pointer', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
+          <button key={sala.id} onClick={() => pedirTurno(sala)} disabled={cargando} style={{ padding: '20px', backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', fontSize: '1.3rem', fontWeight: 'bold', color: '#334155', cursor: cargando ? 'wait' : 'pointer', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.05), 0 4px 6px -2px rgba(0,0,0,0.02)', transition: 'transform 0.1s' }}>
             {sala.nombre}
           </button>
         ))}
