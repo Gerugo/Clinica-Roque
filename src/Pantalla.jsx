@@ -75,10 +75,9 @@ export default function Pantalla() {
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'turnos' }, (payload) => {
         const turnoActualizado = payload.new
         
-        // Si el médico descarta el turno, limpiamos la casilla en la pantalla
         if (turnoActualizado.estado === 'descartado') {
           setTurnosPorSala(prev => ({ ...prev, [turnoActualizado.cola_id]: '-' }))
-          return // Detenemos aquí, no hacemos sonar la alerta
+          return 
         }
         
         if (turnoActualizado.estado === 'llamado') {
@@ -101,47 +100,48 @@ export default function Pantalla() {
   const salaDetalle = llamadaActiva ? salas.find(s => s.id === llamadaActiva.cola_id) : null
 
   return (
-    /* FONDO PRINCIPAL: Degradado azul marino oscuro (Modo Noche TV) */
-    <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)', color: '#fff', fontFamily: 'system-ui, sans-serif', overflowY: 'auto', zIndex: 50 }}>
+    /* CONTENEDOR PRINCIPAL: Flexbox, 100vh exacto y bloqueo absoluto de scroll (overflow: hidden) */
+    <div style={{ position: 'fixed', inset: 0, background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)', color: '#fff', fontFamily: 'system-ui, sans-serif', overflow: 'hidden', zIndex: 50, display: 'flex', flexDirection: 'column', boxSizing: 'border-box', padding: '3vh 3vw' }}>
       <style>{`@keyframes latido { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.02); opacity: 0.95; } 100% { transform: scale(1); opacity: 1; } }`}</style>
 
-      {/* OVERLAY INICIAL (PANTALLA DE ACTIVACIÓN DE AUDIO) */}
+      {/* OVERLAY DE ACTIVACIÓN */}
       {!audioHabilitado && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.7)', backdropFilter: 'blur(10px)', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', zIndex: 1000, textAlign: 'center', padding: '2rem' }}>
-          <h2 style={{ fontSize: '3.5rem', color: '#38bdf8', marginBottom: '1rem', textShadow: '0 4px 10px rgba(0,0,0,0.5)' }}>Pantalla de Pacientes</h2>
-          <p style={{ fontSize: '1.5rem', color: '#e2e8f0', marginBottom: '3rem' }}>Pulsa Iniciar para activar la pantalla completa y el sonido.</p>
-          <button onClick={habilitarAudioYPantalla} style={{ padding: '20px 60px', fontSize: '2rem', fontWeight: 'bold', background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)', color: 'white', border: 'none', borderRadius: '15px', cursor: 'pointer', boxShadow: '0 10px 25px rgba(34, 197, 94, 0.4)', transition: 'transform 0.2s' }} onMouseOver={(e) => e.target.style.transform = 'scale(1.05)'} onMouseOut={(e) => e.target.style.transform = 'scale(1)'}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.7)', backdropFilter: 'blur(10px)', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', zIndex: 1000, textAlign: 'center', padding: '2vw' }}>
+          <h2 style={{ fontSize: 'min(4rem, 8vw)', color: '#38bdf8', marginBottom: '2vh', textShadow: '0 4px 10px rgba(0,0,0,0.5)' }}>Pantalla de Pacientes</h2>
+          <p style={{ fontSize: 'min(1.8rem, 3.5vw)', color: '#e2e8f0', marginBottom: '4vh' }}>Pulsa Iniciar para activar la pantalla completa y el sonido.</p>
+          <button onClick={habilitarAudioYPantalla} style={{ padding: '3vh 6vw', fontSize: 'min(2.5rem, 5vw)', fontWeight: 'bold', background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)', color: 'white', border: 'none', borderRadius: '15px', cursor: 'pointer', boxShadow: '0 10px 25px rgba(34, 197, 94, 0.4)' }}>
             ▶ Iniciar Pantalla
           </button>
         </div>
       )}
 
-      {/* OVERLAY CUANDO LLAMAN A UN TURNO */}
+      {/* OVERLAY NUEVO TURNO LLAMADO */}
       {llamadaActiva && salaDetalle && (
         <div style={{ position: 'fixed', inset: 0, background: 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%)', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', zIndex: 100, animation: 'latido 1.5s infinite ease-in-out' }}>
-          <h2 style={{ fontSize: '6vw', color: '#e0e7ff', margin: '0 0 2rem 0', letterSpacing: '8px', textShadow: '0 4px 10px rgba(0,0,0,0.3)' }}>NUEVO TURNO</h2>
+          <h2 style={{ fontSize: '6vw', color: '#e0e7ff', margin: '0 0 2vh 0', letterSpacing: '8px', textShadow: '0 4px 10px rgba(0,0,0,0.3)' }}>NUEVO TURNO</h2>
           <div style={{ fontSize: '25vw', fontWeight: 'bold', color: '#facc15', lineHeight: '1', textShadow: '0 15px 30px rgba(0,0,0,0.4)' }}>{llamadaActiva.numero}</div>
-          <h1 style={{ fontSize: '8vw', color: '#ffffff', margin: '2rem 0 0 0', borderTop: '4px solid rgba(250, 204, 21, 0.5)', paddingTop: '2rem', textShadow: '0 4px 10px rgba(0,0,0,0.3)' }}>
+          <h1 style={{ fontSize: '7vw', color: '#ffffff', margin: '4vh 0 0 0', borderTop: '4px solid rgba(250, 204, 21, 0.5)', paddingTop: '2vh', textShadow: '0 4px 10px rgba(0,0,0,0.3)' }}>
             Acuda a: {salaDetalle.nombre}
           </h1>
         </div>
       )}
 
-      {/* REJILLA PRINCIPAL DE TURNOS */}
-      <div style={{ padding: '3rem', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-        <header style={{ textAlign: 'center', marginBottom: '4rem' }}>
-          <h1 style={{ fontSize: '4.5rem', margin: '0 0 10px 0', background: '-webkit-linear-gradient(45deg, #38bdf8, #818cf8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Clínica Roque</h1>
-          <p style={{ fontSize: '1.8rem', color: '#94a3b8', margin: 0, letterSpacing: '2px' }}>TURNOS ACTUALES</p>
-        </header>
+      {/* CABECERA (Ajustada dinámicamente) */}
+      <header style={{ textAlign: 'center', marginBottom: '2vh', flexShrink: 0 }}>
+        <h1 style={{ fontSize: 'min(4rem, 7vh)', margin: '0 0 1vh 0', background: '-webkit-linear-gradient(45deg, #38bdf8, #818cf8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Clínica Roque</h1>
+        <p style={{ fontSize: 'min(1.5rem, 3vh)', color: '#94a3b8', margin: 0, letterSpacing: '2px' }}>TURNOS ACTUALES</p>
+      </header>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '3rem', width: '100%', maxWidth: '1400px' }}>
+      {/* REJILLA DE TURNOS (Toma el espacio restante y se auto-centra) */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', width: '100%' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '2vw', width: '100%', maxWidth: '95vw', margin: '0 auto', alignContent: 'center' }}>
           {salas.map((sala) => (
-            <div key={sala.id} style={{ background: 'linear-gradient(145deg, #1e293b 0%, #0f172a 100%)', borderRadius: '24px', padding: '3rem', textAlign: 'center', border: '1px solid #334155', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.4), inset 0 2px 4px rgba(255,255,255,0.05)' }}>
-              <h2 style={{ fontSize: '2.5rem', color: '#f8fafc', margin: '0 0 1.5rem 0', borderBottom: '1px solid #334155', paddingBottom: '20px' }}>{sala.nombre}</h2>
-              <div style={{ fontSize: '7.5rem', fontWeight: 'bold', color: '#4ade80', letterSpacing: '5px', margin: '1.5rem 0', textShadow: '0 0 20px rgba(74, 222, 128, 0.2)' }}>
+            <div key={sala.id} style={{ background: 'linear-gradient(145deg, #1e293b 0%, #0f172a 100%)', borderRadius: '24px', padding: '3vh 2vw', textAlign: 'center', border: '1px solid #334155', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.4), inset 0 2px 4px rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+              <h2 style={{ fontSize: 'min(2.5rem, 4.5vh)', color: '#f8fafc', margin: '0 0 1.5vh 0', borderBottom: '1px solid #334155', paddingBottom: '1.5vh' }}>{sala.nombre}</h2>
+              <div style={{ fontSize: 'min(7rem, 12vh)', fontWeight: 'bold', color: '#4ade80', letterSpacing: '5px', margin: '1.5vh 0', textShadow: '0 0 20px rgba(74, 222, 128, 0.2)', lineHeight: '1' }}>
                 {turnosPorSala[sala.id] || '-'}
               </div>
-              <p style={{ fontSize: '1.5rem', color: '#64748b', margin: '10px 0 0 0', textTransform: 'uppercase', letterSpacing: '1px' }}>Turno Actual</p>
+              <p style={{ fontSize: 'min(1.3rem, 2.5vh)', color: '#64748b', margin: '1vh 0 0 0', textTransform: 'uppercase', letterSpacing: '1px' }}>Turno Actual</p>
             </div>
           ))}
         </div>
