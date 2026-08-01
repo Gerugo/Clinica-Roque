@@ -8,10 +8,21 @@ export default function Pantalla() {
   const [llamadaActiva, setLlamadaActiva] = useState(null)
   
   const temporizadorRef = useRef(null)
+  const audioCtxRef = useRef(null) // <-- NUEVA REFERENCIA PARA EL AUDIO
 
   const reproducirSonido = () => {
     try {
-      const audioCtx = new (window.AudioContext || window.webkitAudioContext)()
+      // 1. Instanciamos el motor de audio solo si no existe ya
+      if (!audioCtxRef.current) {
+        audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)()
+      }
+      
+      const audioCtx = audioCtxRef.current
+
+      // 2. Si el navegador lo ha suspendido por inactividad, lo despertamos
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume()
+      }
       
       const osc1 = audioCtx.createOscillator()
       const gain1 = audioCtx.createGain()
