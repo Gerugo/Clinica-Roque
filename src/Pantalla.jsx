@@ -8,18 +8,16 @@ export default function Pantalla() {
   const [llamadaActiva, setLlamadaActiva] = useState(null)
   
   const temporizadorRef = useRef(null)
-  const audioCtxRef = useRef(null) // <-- NUEVA REFERENCIA PARA EL AUDIO
+  const audioCtxRef = useRef(null)
 
   const reproducirSonido = () => {
     try {
-      // 1. Instanciamos el motor de audio solo si no existe ya
       if (!audioCtxRef.current) {
         audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)()
       }
       
       const audioCtx = audioCtxRef.current
 
-      // 2. Si el navegador lo ha suspendido por inactividad, lo despertamos
       if (audioCtx.state === 'suspended') {
         audioCtx.resume()
       }
@@ -111,59 +109,59 @@ export default function Pantalla() {
   const salaDetalle = llamadaActiva ? salas.find(s => s.id === llamadaActiva.cola_id) : null
 
   return (
-    /* CONTENEDOR PRINCIPAL: Flexbox, 100vh exacto y bloqueo absoluto de scroll (overflow: hidden) */
-    <div style={{ position: 'fixed', inset: 0, background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)', color: '#fff', fontFamily: 'system-ui, sans-serif', overflow: 'hidden', zIndex: 50, display: 'flex', flexDirection: 'column', boxSizing: 'border-box', padding: '3vh 3vw' }}>
-      <style>{`@keyframes latido { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.02); opacity: 0.95; } 100% { transform: scale(1); opacity: 1; } }`}</style>
+    /* CONTENEDOR PRINCIPAL: Ahora usa la imagen de fondo con la ruta exacta de la carpeta public */
+    <div style={{ position: 'fixed', inset: 0, backgroundImage: 'url(/1785611890284.png)', backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat', color: '#fff', fontFamily: 'system-ui, sans-serif', overflow: 'hidden', zIndex: 50, display: 'flex', flexDirection: 'column', boxSizing: 'border-box', padding: '4vh 4vw' }}>
+      <style>{`@keyframes latido { 0% { transform: scale(1); text-shadow: 0 0 20px rgba(197, 160, 89, 0.3); } 50% { transform: scale(1.02); text-shadow: 0 0 40px rgba(197, 160, 89, 0.6); } 100% { transform: scale(1); text-shadow: 0 0 20px rgba(197, 160, 89, 0.3); } }`}</style>
 
-      {/* OVERLAY DE ACTIVACIÓN */}
+      {/* OVERLAY DE ACTIVACIÓN: Adaptado a tonos oscuros y dorados */}
       {!audioHabilitado && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.7)', backdropFilter: 'blur(10px)', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', zIndex: 1000, textAlign: 'center', padding: '2vw' }}>
-          <h2 style={{ fontSize: 'min(4rem, 8vw)', color: '#38bdf8', marginBottom: '2vh', textShadow: '0 4px 10px rgba(0,0,0,0.5)' }}>Pantalla de Pacientes</h2>
-          <p style={{ fontSize: 'min(1.8rem, 3.5vw)', color: '#e2e8f0', marginBottom: '4vh' }}>Pulsa Iniciar para activar la pantalla completa y el sonido.</p>
-          <button onClick={habilitarAudioYPantalla} style={{ padding: '3vh 6vw', fontSize: 'min(2.5rem, 5vw)', fontWeight: 'bold', background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)', color: 'white', border: 'none', borderRadius: '15px', cursor: 'pointer', boxShadow: '0 10px 25px rgba(34, 197, 94, 0.4)' }}>
-            ▶ Iniciar Pantalla
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(20, 25, 30, 0.85)', backdropFilter: 'blur(15px)', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', zIndex: 1000, textAlign: 'center', padding: '2vw' }}>
+          <h2 style={{ fontSize: 'min(4rem, 8vw)', color: '#c5a059', marginBottom: '2vh', fontWeight: '300', letterSpacing: '4px' }}>Sistema de Turnos</h2>
+          <p style={{ fontSize: 'min(1.8rem, 3.5vw)', color: '#8b9a7b', marginBottom: '4vh' }}>Pulse para conectar con la base de datos de Clínica Roque.</p>
+          <button onClick={habilitarAudioYPantalla} style={{ padding: '3vh 6vw', fontSize: 'min(2.5rem, 5vw)', fontWeight: 'bold', background: 'linear-gradient(135deg, #c5a059 0%, #a38241 100%)', color: '#1a1c23', border: 'none', borderRadius: '15px', cursor: 'pointer', boxShadow: '0 10px 25px rgba(197, 160, 89, 0.2)' }}>
+            ▶ Activar Pantalla
           </button>
         </div>
       )}
 
-      {/* OVERLAY NUEVO TURNO LLAMADO */}
+      {/* OVERLAY NUEVO TURNO LLAMADO: Efecto premium en cristal oscuro con oro */}
       {llamadaActiva && salaDetalle && (
-        <div style={{ position: 'fixed', inset: 0, background: 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%)', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', zIndex: 100, animation: 'latido 1.5s infinite ease-in-out' }}>
-          <h2 style={{ fontSize: '6vw', color: '#e0e7ff', margin: '0 0 2vh 0', letterSpacing: '8px', textShadow: '0 4px 10px rgba(0,0,0,0.3)' }}>NUEVO TURNO</h2>
-          <div style={{ fontSize: '25vw', fontWeight: 'bold', color: '#facc15', lineHeight: '1', textShadow: '0 15px 30px rgba(0,0,0,0.4)' }}>{llamadaActiva.numero}</div>
-          <h1 style={{ fontSize: '7vw', color: '#ffffff', margin: '4vh 0 0 0', borderTop: '4px solid rgba(250, 204, 21, 0.5)', paddingTop: '2vh', textShadow: '0 4px 10px rgba(0,0,0,0.3)' }}>
-            Acuda a: {salaDetalle.nombre}
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(26, 30, 36, 0.90)', backdropFilter: 'blur(20px)', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', zIndex: 100 }}>
+          <h2 style={{ fontSize: '5vw', color: '#8b9a7b', margin: '0 0 2vh 0', letterSpacing: '12px', textTransform: 'uppercase', fontWeight: '400' }}>Nuevo Turno</h2>
+          <div style={{ fontSize: '28vw', fontWeight: 'bold', color: '#c5a059', lineHeight: '1', animation: 'latido 1.5s infinite ease-in-out' }}>{llamadaActiva.numero}</div>
+          <h1 style={{ fontSize: '6vw', color: '#f3f4f6', margin: '3vh 0 0 0', fontWeight: '300', letterSpacing: '2px' }}>
+            Por favor, acuda a <strong style={{ color: '#c5a059', fontWeight: '600' }}>{salaDetalle.nombre}</strong>
           </h1>
         </div>
       )}
 
-      {/* NUEVA CABECERA CON EL LOGO */}
-      <header style={{ textAlign: 'center', marginBottom: '3vh', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-        <img 
-          src="/pwa-192x192.png" 
-          alt="Logo Clínica Roque" 
-          style={{ 
-            width: 'min(150px, 15vh)', /* Se adapta a la altura de la TV */
-            height: 'min(150px, 15vh)', 
-            objectFit: 'cover', 
-            borderRadius: '25px', 
-            boxShadow: '0 4px 15px rgba(0,0,0,0.3)', 
-            marginBottom: '1.5vh' 
-          }} 
-        />
-        <p style={{ fontSize: 'min(1.5rem, 3vh)', color: '#94a3b8', margin: 0, letterSpacing: '3px', fontWeight: 'bold' }}>TURNOS ACTUALES</p>
+      {/* CABECERA: Simplificada porque la imagen ya tiene la marca visual enorme */}
+      <header style={{ textAlign: 'center', marginBottom: '4vh', flexShrink: 0 }}>
+        <p style={{ fontSize: 'min(1.8rem, 3.5vh)', color: '#c5a059', margin: 0, letterSpacing: '6px', fontWeight: '300', textTransform: 'uppercase' }}>Turnos Actuales</p>
       </header>
 
-      {/* REJILLA DE TURNOS (Toma el espacio restante y se auto-centra) */}
+      {/* REJILLA DE TURNOS: Efecto Glassmorphism (Cristal) para dejar ver la imagen de fondo */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', width: '100%' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '2vw', width: '100%', maxWidth: '95vw', margin: '0 auto', alignContent: 'center' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '2.5vw', width: '100%', maxWidth: '95vw', margin: '0 auto', alignContent: 'center' }}>
           {salas.map((sala) => (
-            <div key={sala.id} style={{ background: 'linear-gradient(145deg, #1e293b 0%, #0f172a 100%)', borderRadius: '24px', padding: '3vh 2vw', textAlign: 'center', border: '1px solid #334155', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.4), inset 0 2px 4px rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-              <h2 style={{ fontSize: 'min(2.5rem, 4.5vh)', color: '#f8fafc', margin: '0 0 1.5vh 0', borderBottom: '1px solid #334155', paddingBottom: '1.5vh' }}>{sala.nombre}</h2>
-              <div style={{ fontSize: 'min(7rem, 12vh)', fontWeight: 'bold', color: '#4ade80', letterSpacing: '5px', margin: '1.5vh 0', textShadow: '0 0 20px rgba(74, 222, 128, 0.2)', lineHeight: '1' }}>
+            <div key={sala.id} style={{ 
+              background: 'rgba(30, 35, 42, 0.55)', 
+              backdropFilter: 'blur(12px)', 
+              borderRadius: '20px', 
+              padding: '4vh 2vw', 
+              textAlign: 'center', 
+              border: '1px solid rgba(197, 160, 89, 0.25)', 
+              boxShadow: '0 20px 40px rgba(0, 0, 0, 0.4)',
+              display: 'flex', 
+              flexDirection: 'column', 
+              justifyContent: 'center' 
+            }}>
+              <h2 style={{ fontSize: 'min(2.5rem, 4.5vh)', color: '#e5e7eb', margin: '0 0 1.5vh 0', fontWeight: '400', letterSpacing: '1px' }}>{sala.nombre}</h2>
+              <div style={{ width: '60px', height: '1px', background: 'linear-gradient(90deg, transparent, #c5a059, transparent)', margin: '0 auto 2vh auto' }}></div>
+              <div style={{ fontSize: 'min(7rem, 12vh)', fontWeight: 'bold', color: '#c5a059', letterSpacing: '4px', margin: '1.5vh 0', lineHeight: '1', textShadow: '0 4px 15px rgba(0,0,0,0.5)' }}>
                 {turnosPorSala[sala.id] || '-'}
               </div>
-              <p style={{ fontSize: 'min(1.3rem, 2.5vh)', color: '#64748b', margin: '1vh 0 0 0', textTransform: 'uppercase', letterSpacing: '1px' }}>Turno Actual</p>
+              <p style={{ fontSize: 'min(1.3rem, 2.5vh)', color: '#8b9a7b', margin: '2vh 0 0 0', textTransform: 'uppercase', letterSpacing: '3px', fontWeight: '600' }}>Turno Actual</p>
             </div>
           ))}
         </div>
