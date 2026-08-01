@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from './supabase.js'
+import InstallButton from './InstallButton'
 
 const PUBLIC_VAPID_KEY = 'BLwFdwnK3Qh0TUVGdSu0uSIJltf6pMpybCqagPIzWiTL4ZSlQjgeUnIFlqXHM3vnCemBDcCgmd_uTICoNhIN2gQ';
 
@@ -71,7 +72,7 @@ export default function Recepcion() {
     localStorage.setItem('turnos_paciente', JSON.stringify(misTurnos))
   }, [misTurnos])
 
-  // 3. Suscripción Realtime (CORREGIDA: Ahora es permanente y no sufre micro-cortes)
+  // 3. Suscripción Realtime 
   useEffect(() => {
     const canalPaciente = supabase
       .channel('paciente-updates')
@@ -101,7 +102,7 @@ export default function Recepcion() {
       .subscribe()
 
     return () => supabase.removeChannel(canalPaciente)
-  }, []) // <-- ARRAY VACÍO: La conexión nunca se reinicia al añadir más turnos
+  }, []) 
 
   // 4. Wake Lock API
   useEffect(() => {
@@ -211,13 +212,23 @@ export default function Recepcion() {
     )
   }
 
-  // PANTALLA 2: DASHBOARD DEL PACIENTE
+  // PANTALLA 2: DASHBOARD DEL PACIENTE CON FONDO CORPORATIVO
   return (
-    <div style={{ padding: '1.5rem', fontFamily: 'system-ui, sans-serif', background: 'linear-gradient(to bottom right, #ffffff 0%, #f1f5f9 100%)', minHeight: '100vh' }}>
+    <div style={{ 
+      padding: '1.5rem', 
+      fontFamily: 'system-ui, sans-serif', 
+      minHeight: '100vh',
+      backgroundImage: `linear-gradient(rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.95)), url('/fondousuario.png')`,
+      backgroundSize: 'cover',
+      backgroundPosition: 'center',
+      backgroundAttachment: 'fixed'
+    }}>
       
-      <header style={{ textAlign: 'center', marginBottom: '2rem', marginTop: '1rem' }}>
+      <header style={{ textAlign: 'center', marginBottom: '1rem', marginTop: '1rem' }}>
         <h1 style={{ color: '#0f172a', fontSize: '2rem', margin: '0 0 5px 0' }}>Clínica Roque</h1>
       </header>
+
+      <InstallButton />
 
       {turnosEnEspera.length > 0 && (
         <div style={{ marginBottom: '3rem', maxWidth: '400px', margin: '0 auto 3rem auto' }}>
@@ -262,7 +273,7 @@ export default function Recepcion() {
                 disabled={cargando || yaTieneTurno} 
                 style={{ 
                   padding: '20px', 
-                  backgroundColor: yaTieneTurno ? '#f8fafc' : '#fff', 
+                  backgroundColor: yaTieneTurno ? '#f8fafc' : 'rgba(255, 255, 255, 0.9)', 
                   border: '1px solid #e2e8f0', 
                   borderRadius: '12px', 
                   fontSize: '1.3rem', 
@@ -271,7 +282,8 @@ export default function Recepcion() {
                   cursor: (cargando || yaTieneTurno) ? 'not-allowed' : 'pointer', 
                   boxShadow: yaTieneTurno ? 'none' : '0 10px 15px -3px rgba(0,0,0,0.05)', 
                   transition: 'transform 0.1s',
-                  opacity: yaTieneTurno ? 0.7 : 1
+                  opacity: yaTieneTurno ? 0.7 : 1,
+                  backdropFilter: 'blur(4px)' // Un ligero difuminado detrás del botón para que resalte más sobre el fondo
                 }}
               >
                 {sala.nombre}
