@@ -1,13 +1,27 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import Pantalla from './Pantalla'
 import Admin from './Admin'
 import Recepcion from './Recepcion'
 
 function App() {
+  const [modoKiosco, setModoKiosco] = useState(false)
+
+  useEffect(() => {
+    // Detecta si la web se está ejecutando como app instalada en el móvil/PC (PWA)
+    const esPWA = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+    setModoKiosco(esPWA);
+  }, [])
+
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Pantalla />} />
+        {/* Si detecta que es la PWA instalada, te expulsa automáticamente a recepción. 
+            Si entras desde el navegador web normal, te muestra la pantalla de la TV. */}
+        <Route 
+          path="/" 
+          element={modoKiosco ? <Navigate to="/recepcion" replace /> : <Pantalla />} 
+        />
         <Route path="/admin" element={<Admin />} />
         <Route path="/recepcion" element={<Recepcion />} />
       </Routes>
