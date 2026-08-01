@@ -126,10 +126,21 @@ export default function Pantalla() {
         </div>
       )}
 
-      {/* CABECERA (Ajustada dinámicamente) */}
-      <header style={{ textAlign: 'center', marginBottom: '2vh', flexShrink: 0 }}>
-        <h1 style={{ fontSize: 'min(4rem, 7vh)', margin: '0 0 1vh 0', background: '-webkit-linear-gradient(45deg, #38bdf8, #818cf8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Clínica Roque</h1>
-        <p style={{ fontSize: 'min(1.5rem, 3vh)', color: '#94a3b8', margin: 0, letterSpacing: '2px' }}>TURNOS ACTUALES</p>
+      {/* NUEVA CABECERA CON EL LOGO */}
+      <header style={{ textAlign: 'center', marginBottom: '3vh', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <img 
+          src="/pwa-192x192.png" 
+          alt="Logo Clínica Roque" 
+          style={{ 
+            width: 'min(150px, 15vh)', /* Se adapta a la altura de la TV */
+            height: 'min(150px, 15vh)', 
+            objectFit: 'cover', 
+            borderRadius: '25px', 
+            boxShadow: '0 4px 15px rgba(0,0,0,0.3)', 
+            marginBottom: '1.5vh' 
+          }} 
+        />
+        <p style={{ fontSize: 'min(1.5rem, 3vh)', color: '#94a3b8', margin: 0, letterSpacing: '3px', fontWeight: 'bold' }}>TURNOS ACTUALES</p>
       </header>
 
       {/* REJILLA DE TURNOS (Toma el espacio restante y se auto-centra) */}
