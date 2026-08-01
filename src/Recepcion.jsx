@@ -224,8 +224,21 @@ export default function Recepcion() {
       backgroundAttachment: 'fixed'
     }}>
       
-      <header style={{ textAlign: 'center', marginBottom: '1rem', marginTop: '1rem' }}>
-        <h1 style={{ color: '#0f172a', fontSize: '2rem', margin: '0 0 5px 0' }}>Clínica Roque</h1>
+      {/* NUEVA CABECERA CON EL LOGO */}
+      <header style={{ textAlign: 'center', marginBottom: '1rem', marginTop: '1rem', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <img 
+          src="/pwa-192x192.png" 
+          alt="Logo Clínica Roque" 
+          style={{ 
+            width: '90px', 
+            height: '90px', 
+            objectFit: 'cover', 
+            borderRadius: '20px', 
+            boxShadow: '0 4px 10px rgba(0,0,0,0.1)', 
+            marginBottom: '15px' 
+          }} 
+        />
+        <h1 style={{ color: '#0f172a', fontSize: '2.2rem', margin: '0 0 5px 0', textShadow: '0 2px 4px rgba(255,255,255,0.8)' }}>Clínica Roque</h1>
       </header>
 
       <InstallButton />
@@ -283,7 +296,7 @@ export default function Recepcion() {
                   boxShadow: yaTieneTurno ? 'none' : '0 10px 15px -3px rgba(0,0,0,0.05)', 
                   transition: 'transform 0.1s',
                   opacity: yaTieneTurno ? 0.7 : 1,
-                  backdropFilter: 'blur(4px)' // Un ligero difuminado detrás del botón para que resalte más sobre el fondo
+                  backdropFilter: 'blur(4px)'
                 }}
               >
                 {sala.nombre}
