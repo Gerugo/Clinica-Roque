@@ -26,10 +26,19 @@ export default function InstallButton() {
       setDeferredPrompt(e); // Guarda el evento para nuestro botón
     };
 
+    // 4. NUEVO: Escuchar cuando la instalación se completa con éxito
+    const handleAppInstalled = () => {
+      setIsInstalled(true);
+      setDeferredPrompt(null);
+      console.log('PWA instalada en el sistema operativo');
+    };
+
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.addEventListener('appinstalled', handleAppInstalled);
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', handleAppInstalled);
     };
   }, []);
 
@@ -38,7 +47,7 @@ export default function InstallButton() {
     deferredPrompt.prompt();
     const { outcome } = await deferredPrompt.userChoice;
     if (outcome === 'accepted') {
-      console.log('App instalada con éxito');
+      console.log('El usuario aceptó la instalación');
     }
     setDeferredPrompt(null); // Oculta el botón tras usarlo
   };
