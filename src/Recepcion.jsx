@@ -224,21 +224,19 @@ export default function Recepcion() {
       backgroundAttachment: 'fixed'
     }}>
       
-      {/* NUEVA CABECERA CON EL LOGO */}
-      <header style={{ textAlign: 'center', marginBottom: '1rem', marginTop: '1rem', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+      {/* CABECERA CORREGIDA: Solo el logo, un poco más grande como protagonista */}
+      <header style={{ textAlign: 'center', marginBottom: '1.5rem', marginTop: '1rem', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
         <img 
           src="/pwa-192x192.png" 
           alt="Logo Clínica Roque" 
           style={{ 
-            width: '90px', 
-            height: '90px', 
+            width: '110px', /* Aumentado de 90px a 110px */
+            height: '110px', /* Aumentado de 90px a 110px */
             objectFit: 'cover', 
-            borderRadius: '20px', 
-            boxShadow: '0 4px 10px rgba(0,0,0,0.1)', 
-            marginBottom: '15px' 
+            borderRadius: '25px', 
+            boxShadow: '0 4px 10px rgba(0,0,0,0.1)'
           }} 
         />
-        <h1 style={{ color: '#0f172a', fontSize: '2.2rem', margin: '0 0 5px 0', textShadow: '0 2px 4px rgba(255,255,255,0.8)' }}>Clínica Roque</h1>
       </header>
 
       <InstallButton />
