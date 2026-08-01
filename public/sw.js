@@ -17,10 +17,10 @@ self.addEventListener('push', (event) => {
     vibrate: [300, 100, 300, 100, 300], // Patrón de vibración
     tag: 'turno-alerta', // Evita que se acumulen notificaciones duplicadas
     renotify: true,
-    requireInteraction: true, // <-- NUEVO: Obliga a que el paciente interactúe para que desaparezca
-    silent: false,            // <-- NUEVO: Pide explícitamente al OS que no la silencie
+    requireInteraction: true, // Obliga a que el paciente interactúe para que desaparezca
+    silent: false,            // Pide explícitamente al OS que no la silencie
     data: {
-      url: self.location.origin
+      url: '/recepcion'       // Ruta a la que navegará al hacer clic
     }
   };
 
@@ -36,12 +36,14 @@ self.addEventListener('notificationclick', (event) => {
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
       for (let client of windowClients) {
+        // Si la PWA ya está abierta en segundo plano, la trae al frente
         if ('focus' in client) {
           return client.focus();
         }
       }
+      // Si la PWA estaba totalmente cerrada, la abre en la recepción
       if (clients.openWindow) {
-        return clients.openWindow('/');
+        return clients.openWindow('/recepcion');
       }
     })
   );
