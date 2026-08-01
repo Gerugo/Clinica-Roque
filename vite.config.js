@@ -15,6 +15,8 @@ export default defineConfig({
         theme_color: '#000000', // Pon aquí el color principal de tu UI
         background_color: '#ffffff',
         display: 'standalone', // ESTO ES CLAVE: Oculta la barra de direcciones del navegador
+        start_url: '/recepcion', // NUEVO: Fuerza a la PWA a abrir directamente la selección de cola
+        scope: '/recepcion', // NUEVO: Encierra al usuario. Si intenta ir a "/" o "/admin", el móvil lo bloqueará o lo sacará de la app
         icons: [
           {
             src: 'pwa-192x192.png',
