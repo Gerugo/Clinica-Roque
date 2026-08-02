@@ -117,20 +117,27 @@ export default function Admin() {
   }
 
   // =========================================================
-  // MODIFICADO: Acepta un tipo de alerta (llamado o preaviso)
+  // EL FIX: PARSEO SEGURO DE LA SUSCRIPCIÓN
   // =========================================================
   const dispararPush = async (suscripcion, nombreSala, numero, tipoAlerta = 'llamado') => {
     try {
+      // 1. Convertimos el string que viene de la BD a un Objeto puro
+      const suscripcionObj = typeof suscripcion === 'string' 
+        ? JSON.parse(suscripcion) 
+        : suscripcion;
+
+      // 2. Enviamos el objeto ya limpio a la Edge Function
       await supabase.functions.invoke('enviar-alerta', {
-        body: { suscripcion: suscripcion, sala: nombreSala, numero: numero, tipo: tipoAlerta }
+        body: { suscripcion: suscripcionObj, sala: nombreSala, numero: numero, tipo: tipoAlerta }
       })
-    } catch (error) { console.error("Error al enviar Push:", error) }
+    } catch (error) { 
+      console.error("Error al enviar Push:", error) 
+    }
   }
 
   const llamarSiguiente = async (salaId) => {
     setCargandoCola(salaId)
     
-    // MODIFICADO: Pedimos limit(4) para poder ver quién queda en 3ª posición
     const { data: turnosEspera, error: errorBusqueda } = await supabase
       .from('turnos').select('*').eq('cola_id', salaId).eq('estado', 'espera')
       .order('created_at', { ascending: true }).limit(4)
@@ -147,12 +154,12 @@ export default function Admin() {
       
       const sala = colas.find(c => c.id === salaId)
 
-      // 1. Notificamos al que le toca entrar AHORA
+      // Notificamos al que le toca entrar
       if (turnoALlamar.suscripcion_push) {
         dispararPush(turnoALlamar.suscripcion_push, sala.nombre, turnoALlamar.numero, 'llamado')
       }
 
-      // 2. NUEVO: Pre-aviso al paciente que acaba de avanzar a la 3ª posición (índice 3 original)
+      // Pre-aviso al paciente en 3ª posición
       const pacientePreaviso = turnosEspera[3]; 
       if (pacientePreaviso && pacientePreaviso.suscripcion_push) {
         dispararPush(pacientePreaviso.suscripcion_push, sala.nombre, pacientePreaviso.numero, 'preaviso')
