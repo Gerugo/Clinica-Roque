@@ -1,29 +1,38 @@
 // public/sw.js
 
-// 1. Escuchar cuando llega la notificación Push desde el servidor
+// 1. Escuchar cuando llega la notificación Push desde el servidor (Edge Function)
 self.addEventListener('push', (event) => {
-  let data = { title: '¡Su turno!', body: 'Es momento de entrar a la consulta.' };
+  // Datos por defecto ultra-seguros
+  let data = { 
+    title: '¡Es su turno!', 
+    body: 'Por favor, acuda a la consulta indicada en la pantalla.' 
+  };
 
   try {
     if (event.data) {
-      data = event.data.json();
+      // Intentamos parsear. Tu Edge Function DEBE enviar un JSON con 'title' y 'body'
+      const parsedData = event.data.json();
+      if (parsedData.title) data.title = parsedData.title;
+      if (parsedData.body) data.body = parsedData.body;
     }
   } catch (e) {
-    console.log('Error parseando datos push:', e);
+    console.error('El payload de Supabase no es un JSON válido, usando textos por defecto.', e);
   }
 
   const opciones = {
     body: data.body,
-    vibrate: [300, 100, 300, 100, 300], // Patrón de vibración
-    tag: 'turno-alerta', // Evita que se acumulen notificaciones duplicadas
+    icon: '/pwa-192x192.png', // CRÍTICO: Da legitimidad a la notificación en Android
+    badge: '/pwa-192x192.png', // CRÍTICO: Icono monocromo para la barra superior
+    vibrate: [500, 200, 500, 200, 500], // Patrón más agresivo para pantallas bloqueadas
+    tag: 'turno-alerta', 
     renotify: true,
-    requireInteraction: true, // Obliga a que el paciente interactúe para que desaparezca
-    silent: false,            // Pide explícitamente al OS que no la silencie
+    requireInteraction: true, 
     data: {
-      url: '/recepcion'       // Ruta a la que navegará al hacer clic
+      url: '/recepcion' 
     }
   };
 
+  // Forzamos al sistema operativo a esperar a que la notificación se levante
   event.waitUntil(
     self.registration.showNotification(data.title, opciones)
   );
@@ -35,13 +44,13 @@ self.addEventListener('notificationclick', (event) => {
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+      // Buscar si ya hay una pestaña abierta con la app
       for (let client of windowClients) {
-        // Si la PWA ya está abierta en segundo plano, la trae al frente
-        if ('focus' in client) {
+        if (client.url.includes('/recepcion') && 'focus' in client) {
           return client.focus();
         }
       }
-      // Si la PWA estaba totalmente cerrada, la abre en la recepción
+      // Si la PWA estaba totalmente cerrada en segundo plano, la abre
       if (clients.openWindow) {
         return clients.openWindow('/recepcion');
       }
