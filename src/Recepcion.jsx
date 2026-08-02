@@ -19,7 +19,11 @@ export default function Recepcion() {
   const [salas, setSalas] = useState([])
   const [cargando, setCargando] = useState(false)
   
-  // SOLUCIÓN AL BORRADO: Inicializar leyendo directamente de localStorage
+  // NUEVO: Estado para almacenar cuántas personas hay por delante en cada turno
+  const [posiciones, setPosiciones] = useState({})
+  // NUEVO: Un disparador para recalcular la fila cuando cualquier turno avance
+  const [triggerPosiciones, setTriggerPosiciones] = useState(0)
+  
   const [misTurnos, setMisTurnos] = useState(() => {
     try {
       const guardados = localStorage.getItem('turnos_paciente');
@@ -47,15 +51,12 @@ export default function Recepcion() {
     }
   }
 
-  // 1. Carga inicial Y RECONEXIÓN: Sincronizar el estado real de los turnos con la base de datos
+  // 1. Carga inicial Y RECONEXIÓN
   useEffect(() => {
     const inicializarDatos = async () => {
-      // Cargar salas
       const { data: salasData } = await supabase.from('colas').select('*').eq('activa', true).order('nombre', { ascending: true })
       if (salasData) setSalas(salasData)
 
-      // Leemos del localStorage dentro de la función para asegurar que React tiene 
-      // los datos más frescos al encender la pantalla tras mucho tiempo inactivo
       const guardados = localStorage.getItem('turnos_paciente');
       const turnosLocales = guardados ? JSON.parse(guardados) : [];
 
@@ -74,12 +75,13 @@ export default function Recepcion() {
           setMisTurnos(turnosValidos)
         }
       }
+      
+      // Forzamos recálculo de la fila al volver a la app
+      setTriggerPosiciones(prev => prev + 1);
     }
 
-    // Ejecutamos la carga inicial al abrir la app
     inicializarDatos()
 
-    // --- EL PARCHE: Detectar encendido de pantalla para recargar estado ---
     const manejarVisibilidad = () => {
       if (document.visibilityState === 'visible') {
         console.log("Pantalla encendida: Refrescando conexión y turnos con Supabase...");
@@ -88,24 +90,29 @@ export default function Recepcion() {
     };
 
     document.addEventListener('visibilitychange', manejarVisibilidad);
-
     return () => {
       document.removeEventListener('visibilitychange', manejarVisibilidad);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []) // Solo se monta una vez, pero reacciona a la visibilidad
+  }, []) 
 
   // 2. Guardar en localStorage de forma segura
   useEffect(() => {
     localStorage.setItem('turnos_paciente', JSON.stringify(misTurnos))
   }, [misTurnos])
 
-  // 3. Suscripción Realtime
+  // 3. Suscripción Realtime (Modificada para el tracker de fila)
   useEffect(() => {
     const canalPaciente = supabase
       .channel('paciente-updates')
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'turnos' }, (payload) => {
         const turnoActualizado = payload.new
+        
+        // REGLA NUEVA: Si algún paciente (sea quien sea) cambia de estado, recalculamos la fila
+        if (['llamado', 'descartado', 'atendido'].includes(turnoActualizado.estado)) {
+          setTriggerPosiciones(prev => prev + 1);
+        }
+
         setMisTurnos(prevTurnos => {
           const index = prevTurnos.findIndex(t => t.id === turnoActualizado.id)
           if (index === -1) return prevTurnos 
@@ -126,7 +133,7 @@ export default function Recepcion() {
     return () => supabase.removeChannel(canalPaciente)
   }, []) 
 
-  // 4. WakeLock: Mantener pantalla encendida si hay espera
+  // 4. WakeLock: Mantener pantalla encendida
   useEffect(() => {
     let wakeLock = null;
     const solicitarPantallaEncendida = async () => {
@@ -141,6 +148,37 @@ export default function Recepcion() {
     return () => { if (wakeLock !== null) wakeLock.release(); };
   }, [misTurnos]);
 
+  const turnosEnEspera = misTurnos.filter(t => t.estado === 'espera')
+
+  // 5. NUEVO: Cálculo dinámico de pacientes por delante
+  useEffect(() => {
+    const calcularPosiciones = async () => {
+      const nuevasPosiciones = {};
+      for (const turno of turnosEnEspera) {
+        try {
+          // Buscamos cuántos turnos en 'espera' tienen un ID menor al nuestro en la misma sala
+          const { count, error } = await supabase
+            .from('turnos')
+            .select('*', { count: 'exact', head: true })
+            .eq('cola_id', turno.cola_id)
+            .eq('estado', 'espera')
+            .lt('id', turno.id); 
+            
+          if (!error) {
+            nuevasPosiciones[turno.id] = count || 0;
+          }
+        } catch (e) {
+          console.error("Error calculando posición", e);
+        }
+      }
+      setPosiciones(nuevasPosiciones);
+    };
+
+    if (turnosEnEspera.length > 0) {
+      calcularPosiciones();
+    }
+  }, [turnosEnEspera.length, triggerPosiciones]); // Se recalcula cuando hay cambios de estado globales o en nuestros turnos
+
   const generarCodigo = () => {
     const caracteres = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
     let codigo = ''
@@ -148,32 +186,20 @@ export default function Recepcion() {
     return codigo
   }
 
-  // =========================================================
-  // EL ANTÍDOTO: DESTRUCCIÓN DE SUSCRIPCIONES ZOMBI
-  // =========================================================
   const obtenerSuscripcionPush = async () => {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-      console.warn("Navegador no compatible con Push");
       return null;
     }
     try {
       const permiso = await Notification.requestPermission();
-      if (permiso !== 'granted') {
-        console.warn("El paciente denegó las notificaciones");
-        return null;
-      }
+      if (permiso !== 'granted') return null;
       
       const registro = await navigator.serviceWorker.register('/sw.js');
       await navigator.serviceWorker.ready;
       
-      // 1. Buscar y destruir cualquier suscripción zombi anterior
       const suscripcionExistente = await registro.pushManager.getSubscription();
-      if (suscripcionExistente) {
-        console.log("Destruyendo suscripción antigua...");
-        await suscripcionExistente.unsubscribe();
-      }
+      if (suscripcionExistente) await suscripcionExistente.unsubscribe();
 
-      // 2. Crear una suscripción totalmente fresca y limpia
       const suscripcion = await registro.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(PUBLIC_VAPID_KEY)
@@ -181,7 +207,6 @@ export default function Recepcion() {
       
       return suscripcion.toJSON();
     } catch (error) {
-      console.error('Error Web Push:', error);
       return null;
     }
   }
@@ -191,15 +216,9 @@ export default function Recepcion() {
       alert(`Ya tienes un turno activo para ${sala.nombre}`);
       return;
     }
-
     setCargando(true)
     const nuevoCodigo = generarCodigo()
     const datosPush = await obtenerSuscripcionPush();
-
-    // AVISO VISUAL SI FALLA LA SUSCRIPCIÓN
-    if (!datosPush) {
-      alert("⚠️ No se han podido activar las notificaciones en 2º plano. Por favor, no bloquee la pantalla para no perder su turno.");
-    }
 
     const { data, error } = await supabase
       .from('turnos')
@@ -209,32 +228,17 @@ export default function Recepcion() {
     if (!error && data && data.length > 0) {
       const nuevoTurno = { id: data[0].id, numero: nuevoCodigo, sala: sala.nombre, cola_id: sala.id, estado: 'espera' }
       setMisTurnos([...misTurnos, nuevoTurno])
+      // Refrescamos las posiciones al sacar un turno nuevo
+      setTriggerPosiciones(prev => prev + 1);
     } else {
       alert('Error al solicitar el turno.')
     }
     setCargando(false)
   }
 
-  const probarNotificacion = async () => {
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-      alert('Su navegador no soporta notificaciones web.'); return;
-    }
-    if (Notification.permission !== 'granted') {
-      alert('Debe permitir las notificaciones al navegador.'); return;
-    }
-    try {
-      const registration = await navigator.serviceWorker.ready;
-      registration.showNotification('🔔 Prueba de aviso', {
-        body: 'Si su móvil ha vibrado y sonado, ¡todo está configurado correctamente!',
-        vibrate: [300, 100, 300, 100, 300], requireInteraction: true, tag: 'prueba-alerta'
-      });
-    } catch (error) { console.error(error); }
-  };
-
   const turnoLlamado = misTurnos.find(t => t.estado === 'llamado')
-  const turnosEnEspera = misTurnos.filter(t => t.estado === 'espera')
 
-  // NUEVOS ESTILOS: DISEÑO MÉDICO CLARO
+  // NUEVOS ESTILOS
   const fondoAppStyles = {
     padding: '1.5rem',
     fontFamily: 'system-ui, -apple-system, sans-serif',
@@ -277,7 +281,7 @@ export default function Recepcion() {
       <header style={{ textAlign: 'center', marginBottom: '1.5rem', marginTop: '1rem', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
         <img 
           src="/pwa-192x192.png" 
-          alt="Logo Clínica Roque" 
+          alt="Logo Clínica" 
           style={{ width: '100px', height: '100px', objectFit: 'contain', borderRadius: '20px', backgroundColor: 'white', boxShadow: '0 4px 10px rgba(0,0,0,0.05)', padding: '5px' }} 
         />
       </header>
@@ -286,14 +290,35 @@ export default function Recepcion() {
 
       {turnosEnEspera.length > 0 && (
         <div style={{ marginBottom: '3rem', maxWidth: '400px', margin: '0 auto 3rem auto' }}>
+          
+          {/* AVISO VISUAL IMPORTANTE (Ayuda a evitar bloqueos de pantalla) */}
+          <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fef3c7', borderLeft: '4px solid #f59e0b', padding: '12px', borderRadius: '8px', marginBottom: '20px', fontSize: '0.9rem', color: '#92400e' }}>
+            <strong>💡 Un consejo:</strong> Por favor, no cierre esta ventana. Su pantalla se mantendrá encendida para avisarle a tiempo.
+          </div>
+
           <h2 style={{ textAlign: 'center', color: '#64748b', fontSize: '1rem', marginBottom: '1rem', textTransform: 'uppercase', letterSpacing: '1px' }}>Sus turnos actuales:</h2>
           
           <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
             {turnosEnEspera.map(turno => (
               <div key={turno.id} style={{ background: 'white', padding: '20px', borderRadius: '15px', border: '1px solid #e2e8f0', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.05)', textAlign: 'center' }}>
                 <p style={{ margin: '0 0 5px 0', color: '#475569', fontSize: '1.1rem' }}>{turno.sala}</p>
-                <div style={{ fontSize: '4rem', fontWeight: 'bold', color: '#0284c7', letterSpacing: '2px' }}>{turno.numero}</div>
-                <div style={{ marginTop: '15px', display: 'flex', justifyContent: 'center' }}>
+                <div style={{ fontSize: '4rem', fontWeight: 'bold', color: '#0284c7', letterSpacing: '2px', lineHeight: '1.1' }}>{turno.numero}</div>
+                
+                {/* --- NUEVO: CONTADOR DE PACIENTES POR DELANTE --- */}
+                <div style={{ marginTop: '20px', padding: '12px', backgroundColor: posiciones[turno.id] === 0 ? '#ecfdf5' : '#f8fafc', borderRadius: '10px', border: posiciones[turno.id] === 0 ? '1px solid #10b981' : '1px solid #e2e8f0', transition: 'all 0.3s' }}>
+                  <p style={{ margin: '0', fontSize: '0.85rem', color: '#64748b', textTransform: 'uppercase', fontWeight: '600' }}>
+                    Pacientes por delante
+                  </p>
+                  <p style={{ margin: '5px 0 0 0', fontSize: '2rem', fontWeight: 'bold', color: posiciones[turno.id] === 0 ? '#059669' : '#f59e0b' }}>
+                    {posiciones[turno.id] !== undefined ? posiciones[turno.id] : '-'}
+                  </p>
+                  {posiciones[turno.id] === 0 && (
+                    <p style={{ margin: '5px 0 0 0', fontSize: '0.9rem', color: '#059669', fontWeight: '700' }}>¡Prepárese, es el siguiente!</p>
+                  )}
+                </div>
+                {/* ------------------------------------------------ */}
+
+                <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'center' }}>
                   <div style={{ width: '25px', height: '25px', border: '3px solid #e0f2fe', borderTop: '3px solid #0284c7', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
                 </div>
               </div>
