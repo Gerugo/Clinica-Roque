@@ -47,20 +47,24 @@ export default function Recepcion() {
     }
   }
 
-  // 1. Carga inicial: Sincronizar el estado real de los turnos con la base de datos
+  // 1. Carga inicial Y RECONEXIÓN: Sincronizar el estado real de los turnos con la base de datos
   useEffect(() => {
     const inicializarDatos = async () => {
       // Cargar salas
       const { data: salasData } = await supabase.from('colas').select('*').eq('activa', true).order('nombre', { ascending: true })
       if (salasData) setSalas(salasData)
 
-      // Actualizar el estado de los turnos que ya teníamos en memoria
-      if (misTurnos.length > 0) {
-        const ids = misTurnos.map(t => t.id)
+      // Leemos del localStorage dentro de la función para asegurar que React tiene 
+      // los datos más frescos al encender la pantalla tras mucho tiempo inactivo
+      const guardados = localStorage.getItem('turnos_paciente');
+      const turnosLocales = guardados ? JSON.parse(guardados) : [];
+
+      if (turnosLocales.length > 0) {
+        const ids = turnosLocales.map(t => t.id)
         const { data: turnosBD } = await supabase.from('turnos').select('id, estado').in('id', ids)
         
         if (turnosBD) {
-          const turnosValidos = misTurnos.filter(t => {
+          const turnosValidos = turnosLocales.filter(t => {
             const dbT = turnosBD.find(db => db.id === t.id)
             return dbT && (dbT.estado === 'espera' || dbT.estado === 'llamado')
           }).map(t => {
@@ -71,16 +75,32 @@ export default function Recepcion() {
         }
       }
     }
+
+    // Ejecutamos la carga inicial al abrir la app
     inicializarDatos()
+
+    // --- EL PARCHE: Detectar encendido de pantalla para recargar estado ---
+    const manejarVisibilidad = () => {
+      if (document.visibilityState === 'visible') {
+        console.log("Pantalla encendida: Refrescando conexión y turnos con Supabase...");
+        inicializarDatos();
+      }
+    };
+
+    document.addEventListener('visibilitychange', manejarVisibilidad);
+
+    return () => {
+      document.removeEventListener('visibilitychange', manejarVisibilidad);
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []) // Solo se ejecuta al montar
+  }, []) // Solo se monta una vez, pero reacciona a la visibilidad
 
   // 2. Guardar en localStorage de forma segura
   useEffect(() => {
     localStorage.setItem('turnos_paciente', JSON.stringify(misTurnos))
   }, [misTurnos])
 
-  // 3. Suscripción Realtime (Igual, funciona perfecto)
+  // 3. Suscripción Realtime
   useEffect(() => {
     const canalPaciente = supabase
       .channel('paciente-updates')
@@ -106,6 +126,7 @@ export default function Recepcion() {
     return () => supabase.removeChannel(canalPaciente)
   }, []) 
 
+  // 4. WakeLock: Mantener pantalla encendida si hay espera
   useEffect(() => {
     let wakeLock = null;
     const solicitarPantallaEncendida = async () => {
@@ -213,17 +234,17 @@ export default function Recepcion() {
   const turnoLlamado = misTurnos.find(t => t.estado === 'llamado')
   const turnosEnEspera = misTurnos.filter(t => t.estado === 'espera')
 
-  // NUEVOS ESTILOS: DISEÑO MÉDICO CLARO (Estilo QRQ)
+  // NUEVOS ESTILOS: DISEÑO MÉDICO CLARO
   const fondoAppStyles = {
     padding: '1.5rem',
     fontFamily: 'system-ui, -apple-system, sans-serif',
     minHeight: '100vh',
-    backgroundColor: '#f8fafc', // Gris muy clarito
+    backgroundColor: '#f8fafc',
     backgroundImage: 'radial-gradient(circle at top right, #e0f2fe 0%, #f8fafc 40%, #f1f5f9 100%)',
     color: '#0f172a'
   }
 
-  // PANTALLA 1: TURNO LLAMADO (Aviso en verde vibrante)
+  // PANTALLA 1: TURNO LLAMADO
   if (turnoLlamado) {
     return (
       <div style={{ ...fondoAppStyles, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', backgroundColor: '#ecfdf5', backgroundImage: 'none' }}>
@@ -249,11 +270,10 @@ export default function Recepcion() {
     )
   }
 
-  // PANTALLA 2: DASHBOARD DEL PACIENTE (Modo Claro)
+  // PANTALLA 2: DASHBOARD DEL PACIENTE
   return (
     <div style={fondoAppStyles}>
       
-      {/* CABECERA: Ahora sobre fondo claro resalta perfectamente */}
       <header style={{ textAlign: 'center', marginBottom: '1.5rem', marginTop: '1rem', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
         <img 
           src="/pwa-192x192.png" 
