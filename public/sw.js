@@ -1,5 +1,15 @@
 // public/sw.js
 
+// --- NUEVAS ÓRDENES: Forzar actualización y toma de control inmediata ---
+self.addEventListener('install', (event) => {
+  self.skipWaiting(); // Obliga al nuevo Service Worker a instalarse de inmediato, matando al antiguo
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(clients.claim()); // Toma el control de la PWA al instante sin esperar a recargar
+});
+// ------------------------------------------------------------------------
+
 // 1. Escuchar cuando llega la notificación Push desde el servidor (Edge Function)
 self.addEventListener('push', (event) => {
   // Datos por defecto ultra-seguros
