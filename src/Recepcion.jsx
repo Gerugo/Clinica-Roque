@@ -17,8 +17,17 @@ function urlBase64ToUint8Array(base64String) {
 
 export default function Recepcion() {
   const [salas, setSalas] = useState([])
-  const [misTurnos, setMisTurnos] = useState([]) 
   const [cargando, setCargando] = useState(false)
+  
+  // SOLUCIÓN AL BORRADO: Inicializar leyendo directamente de localStorage
+  const [misTurnos, setMisTurnos] = useState(() => {
+    try {
+      const guardados = localStorage.getItem('turnos_paciente');
+      return guardados ? JSON.parse(guardados) : [];
+    } catch (e) {
+      return [];
+    }
+  }) 
 
   const reproducirSonidoMovil = () => {
     try {
@@ -34,22 +43,24 @@ export default function Recepcion() {
       osc.start()
       osc.stop(audioCtx.currentTime + 0.5)
     } catch (e) {
-      console.log('Audio no soportado en este navegador')
+      console.log('Audio no soportado')
     }
   }
 
+  // 1. Carga inicial: Sincronizar el estado real de los turnos con la base de datos
   useEffect(() => {
-    const obtenerDatos = async () => {
+    const inicializarDatos = async () => {
+      // Cargar salas
       const { data: salasData } = await supabase.from('colas').select('*').eq('activa', true).order('nombre', { ascending: true })
       if (salasData) setSalas(salasData)
 
-      const turnosGuardados = JSON.parse(localStorage.getItem('turnos_paciente') || '[]')
-      if (turnosGuardados.length > 0) {
-        const ids = turnosGuardados.map(t => t.id)
+      // Actualizar el estado de los turnos que ya teníamos en memoria
+      if (misTurnos.length > 0) {
+        const ids = misTurnos.map(t => t.id)
         const { data: turnosBD } = await supabase.from('turnos').select('id, estado').in('id', ids)
         
         if (turnosBD) {
-          const turnosValidos = turnosGuardados.filter(t => {
+          const turnosValidos = misTurnos.filter(t => {
             const dbT = turnosBD.find(db => db.id === t.id)
             return dbT && (dbT.estado === 'espera' || dbT.estado === 'llamado')
           }).map(t => {
@@ -57,39 +68,35 @@ export default function Recepcion() {
             return { ...t, estado: dbT.estado } 
           })
           setMisTurnos(turnosValidos)
-        } else {
-          setMisTurnos(turnosGuardados)
         }
       }
     }
-    obtenerDatos()
-  }, [])
+    inicializarDatos()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // Solo se ejecuta al montar
 
+  // 2. Guardar en localStorage de forma segura
   useEffect(() => {
     localStorage.setItem('turnos_paciente', JSON.stringify(misTurnos))
   }, [misTurnos])
 
+  // 3. Suscripción Realtime (Igual, funciona perfecto)
   useEffect(() => {
     const canalPaciente = supabase
       .channel('paciente-updates')
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'turnos' }, (payload) => {
         const turnoActualizado = payload.new
-        
         setMisTurnos(prevTurnos => {
           const index = prevTurnos.findIndex(t => t.id === turnoActualizado.id)
           if (index === -1) return prevTurnos 
-
           if (turnoActualizado.estado === 'descartado') {
             return prevTurnos.filter(t => t.id !== turnoActualizado.id)
           }
-
           const nuevosTurnos = [...prevTurnos]
-          
           if (turnoActualizado.estado === 'llamado' && prevTurnos[index].estado !== 'llamado') {
             if ("vibrate" in navigator) navigator.vibrate([300, 100, 300, 100, 300])
             reproducirSonidoMovil()
           }
-          
           nuevosTurnos[index] = { ...nuevosTurnos[index], estado: turnoActualizado.estado }
           return nuevosTurnos
         })
@@ -107,14 +114,10 @@ export default function Recepcion() {
         if ('wakeLock' in navigator && hayEspera) {
           wakeLock = await navigator.wakeLock.request('screen');
         }
-      } catch (err) {
-        console.log(`Wake Lock no activo`);
-      }
+      } catch (err) {}
     };
     solicitarPantallaEncendida();
-    return () => {
-      if (wakeLock !== null) wakeLock.release();
-    };
+    return () => { if (wakeLock !== null) wakeLock.release(); };
   }, [misTurnos]);
 
   const generarCodigo = () => {
@@ -124,11 +127,18 @@ export default function Recepcion() {
     return codigo
   }
 
+  // EL CHIVATO DE NOTIFICACIONES
   const obtenerSuscripcionPush = async () => {
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return null;
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      console.warn("Navegador no compatible con Push");
+      return null;
+    }
     try {
       const permiso = await Notification.requestPermission();
-      if (permiso !== 'granted') return null;
+      if (permiso !== 'granted') {
+        console.warn("El paciente denegó las notificaciones");
+        return null;
+      }
       const registro = await navigator.serviceWorker.register('/sw.js');
       await navigator.serviceWorker.ready;
       const suscripcion = await registro.pushManager.subscribe({
@@ -151,6 +161,11 @@ export default function Recepcion() {
     setCargando(true)
     const nuevoCodigo = generarCodigo()
     const datosPush = await obtenerSuscripcionPush();
+
+    // AVISO VISUAL SI FALLA LA SUSCRIPCIÓN
+    if (!datosPush) {
+      alert("⚠️ No se han podido activar las notificaciones en 2º plano. Por favor, no bloquee la pantalla para no perder su turno.");
+    }
 
     const { data, error } = await supabase
       .from('turnos')
@@ -185,53 +200,52 @@ export default function Recepcion() {
   const turnoLlamado = misTurnos.find(t => t.estado === 'llamado')
   const turnosEnEspera = misTurnos.filter(t => t.estado === 'espera')
 
-  // ESTILOS COMPARTIDOS DEL FONDO PREMIUM
-  const fondoPremiumStyles = {
+  // NUEVOS ESTILOS: DISEÑO MÉDICO CLARO (Estilo QRQ)
+  const fondoAppStyles = {
     padding: '1.5rem',
-    fontFamily: 'system-ui, sans-serif',
+    fontFamily: 'system-ui, -apple-system, sans-serif',
     minHeight: '100vh',
-    backgroundImage: `linear-gradient(rgba(26, 30, 36, 0.85), rgba(26, 30, 36, 0.95)), url('/1785611890284.png')`,
-    backgroundSize: 'cover',
-    backgroundPosition: 'center',
-    backgroundAttachment: 'fixed',
-    color: '#f3f4f6'
+    backgroundColor: '#f8fafc', // Gris muy clarito
+    backgroundImage: 'radial-gradient(circle at top right, #e0f2fe 0%, #f8fafc 40%, #f1f5f9 100%)',
+    color: '#0f172a'
   }
 
-  // PANTALLA 1: TURNO LLAMADO (Adaptada al nuevo diseño)
+  // PANTALLA 1: TURNO LLAMADO (Aviso en verde vibrante)
   if (turnoLlamado) {
     return (
-      <div style={{ ...fondoPremiumStyles, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
-        <style>{`@keyframes latidoOro { 0% { opacity: 1; transform: scale(1); text-shadow: 0 0 20px rgba(197, 160, 89, 0.3); } 50% { opacity: 0.9; transform: scale(1.05); text-shadow: 0 0 40px rgba(197, 160, 89, 0.6); } 100% { opacity: 1; transform: scale(1); text-shadow: 0 0 20px rgba(197, 160, 89, 0.3); } }`}</style>
-        <div style={{ animation: 'latidoOro 1.5s infinite', textAlign: 'center' }}>
-          <h1 style={{ fontSize: '2.5rem', margin: '0 0 1rem 0', color: '#c5a059', letterSpacing: '4px', fontWeight: '300' }}>¡ES SU TURNO!</h1>
-          <h2 style={{ fontSize: '1.5rem', fontWeight: 'normal', margin: '0 0 2rem 0', color: '#8b9a7b' }}>Diríjase a:</h2>
+      <div style={{ ...fondoAppStyles, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', backgroundColor: '#ecfdf5', backgroundImage: 'none' }}>
+        <style>{`@keyframes latido { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }`}</style>
+        
+        <div style={{ animation: 'latido 1.5s infinite', textAlign: 'center' }}>
+          <h1 style={{ fontSize: '2.5rem', margin: '0 0 1rem 0', color: '#059669', fontWeight: '800' }}>¡ES SU TURNO!</h1>
+          <h2 style={{ fontSize: '1.5rem', fontWeight: 'normal', margin: '0 0 2rem 0', color: '#475569' }}>Diríjase a:</h2>
           
-          <div style={{ fontSize: '2.5rem', fontWeight: 'bold', background: 'rgba(197, 160, 89, 0.1)', border: '1px solid rgba(197, 160, 89, 0.3)', color: '#c5a059', padding: '20px 40px', borderRadius: '20px', marginBottom: '2rem', backdropFilter: 'blur(10px)', boxShadow: '0 10px 30px rgba(0, 0, 0, 0.5)' }}>
+          <div style={{ fontSize: '2.5rem', fontWeight: 'bold', background: 'white', border: '2px solid #34d399', color: '#047857', padding: '20px 40px', borderRadius: '20px', marginBottom: '2rem', boxShadow: '0 10px 25px rgba(5, 150, 105, 0.2)' }}>
             {turnoLlamado.sala}
           </div>
           
-          <div style={{ fontSize: '1.2rem', opacity: '0.9', color: '#e5e7eb' }}>
-            Su código era: <span style={{fontWeight: 'bold', color: '#c5a059'}}>{turnoLlamado.numero}</span>
+          <div style={{ fontSize: '1.2rem', color: '#64748b' }}>
+            Su código era: <span style={{fontWeight: 'bold', color: '#0f172a'}}>{turnoLlamado.numero}</span>
           </div>
         </div>
         
-        <button onClick={() => setMisTurnos(prev => prev.filter(t => t.id !== turnoLlamado.id))} style={{ marginTop: '4rem', padding: '15px 40px', fontSize: '1.1rem', background: 'transparent', border: '1px solid #8b9a7b', color: '#8b9a7b', borderRadius: '12px', cursor: 'pointer', transition: 'all 0.3s', fontWeight: 'bold' }}>
+        <button onClick={() => setMisTurnos(prev => prev.filter(t => t.id !== turnoLlamado.id))} style={{ marginTop: '4rem', padding: '15px 40px', fontSize: '1.1rem', background: '#ffffff', border: '1px solid #cbd5e1', color: '#475569', borderRadius: '12px', cursor: 'pointer', boxShadow: '0 4px 6px rgba(0,0,0,0.05)', fontWeight: 'bold' }}>
           Entendido / Finalizar
         </button>
       </div>
     )
   }
 
-  // PANTALLA 2: DASHBOARD DEL PACIENTE
+  // PANTALLA 2: DASHBOARD DEL PACIENTE (Modo Claro)
   return (
-    <div style={fondoPremiumStyles}>
+    <div style={fondoAppStyles}>
       
-      {/* CABECERA */}
+      {/* CABECERA: Ahora sobre fondo claro resalta perfectamente */}
       <header style={{ textAlign: 'center', marginBottom: '1.5rem', marginTop: '1rem', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
         <img 
           src="/pwa-192x192.png" 
           alt="Logo Clínica Roque" 
-          style={{ width: '100px', height: '100px', objectFit: 'cover', borderRadius: '25px', boxShadow: '0 4px 15px rgba(0,0,0,0.4)', border: '1px solid rgba(197, 160, 89, 0.2)' }} 
+          style={{ width: '100px', height: '100px', objectFit: 'contain', borderRadius: '20px', backgroundColor: 'white', boxShadow: '0 4px 10px rgba(0,0,0,0.05)', padding: '5px' }} 
         />
       </header>
 
@@ -239,36 +253,28 @@ export default function Recepcion() {
 
       {turnosEnEspera.length > 0 && (
         <div style={{ marginBottom: '3rem', maxWidth: '400px', margin: '0 auto 3rem auto' }}>
-          <h2 style={{ textAlign: 'center', color: '#8b9a7b', fontSize: '1rem', marginBottom: '1rem', textTransform: 'uppercase', letterSpacing: '2px' }}>Sus turnos actuales:</h2>
+          <h2 style={{ textAlign: 'center', color: '#64748b', fontSize: '1rem', marginBottom: '1rem', textTransform: 'uppercase', letterSpacing: '1px' }}>Sus turnos actuales:</h2>
           
           <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
             {turnosEnEspera.map(turno => (
-              <div key={turno.id} style={{ background: 'rgba(30, 35, 42, 0.55)', backdropFilter: 'blur(12px)', padding: '20px', borderRadius: '15px', border: '1px solid rgba(197, 160, 89, 0.25)', boxShadow: '0 10px 25px rgba(0, 0, 0, 0.4)', textAlign: 'center' }}>
-                <p style={{ margin: '0 0 5px 0', color: '#e5e7eb', fontSize: '1.1rem', fontWeight: '400' }}>{turno.sala}</p>
-                <div style={{ fontSize: '4rem', fontWeight: 'bold', color: '#c5a059', letterSpacing: '3px', textShadow: '0 4px 10px rgba(0,0,0,0.3)' }}>{turno.numero}</div>
+              <div key={turno.id} style={{ background: 'white', padding: '20px', borderRadius: '15px', border: '1px solid #e2e8f0', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.05)', textAlign: 'center' }}>
+                <p style={{ margin: '0 0 5px 0', color: '#475569', fontSize: '1.1rem' }}>{turno.sala}</p>
+                <div style={{ fontSize: '4rem', fontWeight: 'bold', color: '#0284c7', letterSpacing: '2px' }}>{turno.numero}</div>
                 <div style={{ marginTop: '15px', display: 'flex', justifyContent: 'center' }}>
-                  <div style={{ width: '25px', height: '25px', border: '3px solid rgba(139, 154, 123, 0.3)', borderTop: '3px solid #c5a059', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+                  <div style={{ width: '25px', height: '25px', border: '3px solid #e0f2fe', borderTop: '3px solid #0284c7', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
                 </div>
               </div>
             ))}
           </div>
 
           <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
-
-          {/* TARJETA PRUEBA DE ALERTA PREMIUM */}
-          <div style={{ marginTop: '1.5rem', padding: '1.5rem', background: 'rgba(26, 30, 36, 0.7)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', textAlign: 'center' }}>
-            <h3 style={{ fontSize: '0.9rem', color: '#9ca3af', marginTop: 0, marginBottom: '1rem', fontWeight: 'normal' }}>¿Quiere asegurarse de que le avisaremos?</h3>
-            <button onClick={probarNotificacion} style={{ padding: '10px 20px', background: 'rgba(197, 160, 89, 0.1)', color: '#c5a059', border: '1px solid #c5a059', borderRadius: '8px', fontSize: '0.9rem', fontWeight: 'bold', cursor: 'pointer' }}>
-              🔔 Probar alerta sonora
-            </button>
-          </div>
         </div>
       )}
 
       {/* BOTONERA DE SELECCIÓN DE SALAS */}
       <div style={{ maxWidth: '400px', margin: '0 auto' }}>
-        <h2 style={{ textAlign: 'center', color: '#e5e7eb', marginBottom: '1.5rem', fontSize: '1.1rem', fontWeight: '300' }}>
-          {turnosEnEspera.length > 0 ? '¿Necesita cita para otra consulta?' : 'Seleccione la consulta:'}
+        <h2 style={{ textAlign: 'center', color: '#334155', marginBottom: '1.5rem', fontSize: '1.1rem', fontWeight: '600' }}>
+          {turnosEnEspera.length > 0 ? '¿Necesita otra consulta?' : 'Seleccione la consulta:'}
         </h2>
         
         <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
@@ -282,21 +288,21 @@ export default function Recepcion() {
                 disabled={cargando || yaTieneTurno} 
                 style={{ 
                   padding: '20px', 
-                  background: yaTieneTurno ? 'rgba(30, 35, 42, 0.3)' : 'rgba(30, 35, 42, 0.7)', 
-                  border: yaTieneTurno ? '1px solid rgba(255,255,255,0.05)' : '1px solid rgba(139, 154, 123, 0.4)', 
-                  borderRadius: '12px', 
+                  background: yaTieneTurno ? '#f8fafc' : '#ffffff', 
+                  border: '1px solid',
+                  borderColor: yaTieneTurno ? '#e2e8f0' : '#cbd5e1', 
+                  borderRadius: '16px', 
                   fontSize: '1.2rem', 
-                  fontWeight: 'normal', 
-                  color: yaTieneTurno ? '#6b7280' : '#f3f4f6', 
+                  fontWeight: '600', 
+                  color: yaTieneTurno ? '#94a3b8' : '#1e293b', 
                   cursor: (cargando || yaTieneTurno) ? 'not-allowed' : 'pointer', 
-                  boxShadow: yaTieneTurno ? 'none' : '0 8px 20px rgba(0,0,0,0.3)', 
+                  boxShadow: yaTieneTurno ? 'none' : '0 4px 6px -1px rgba(0, 0, 0, 0.05)', 
                   transition: 'all 0.2s',
-                  backdropFilter: 'blur(8px)'
                 }}
               >
                 {sala.nombre}
                 {yaTieneTurno && (
-                  <span style={{ display: 'block', fontSize: '0.85rem', color: '#c5a059', marginTop: '8px', fontWeight: 'normal' }}>
+                  <span style={{ display: 'block', fontSize: '0.85rem', color: '#0284c7', marginTop: '8px', fontWeight: 'normal' }}>
                     Turno activo
                   </span>
                 )}
