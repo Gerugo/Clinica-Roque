@@ -127,7 +127,9 @@ export default function Recepcion() {
     return codigo
   }
 
-  // EL CHIVATO DE NOTIFICACIONES
+  // =========================================================
+  // EL ANTÍDOTO: DESTRUCCIÓN DE SUSCRIPCIONES ZOMBI
+  // =========================================================
   const obtenerSuscripcionPush = async () => {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
       console.warn("Navegador no compatible con Push");
@@ -139,12 +141,23 @@ export default function Recepcion() {
         console.warn("El paciente denegó las notificaciones");
         return null;
       }
+      
       const registro = await navigator.serviceWorker.register('/sw.js');
       await navigator.serviceWorker.ready;
+      
+      // 1. Buscar y destruir cualquier suscripción zombi anterior
+      const suscripcionExistente = await registro.pushManager.getSubscription();
+      if (suscripcionExistente) {
+        console.log("Destruyendo suscripción antigua...");
+        await suscripcionExistente.unsubscribe();
+      }
+
+      // 2. Crear una suscripción totalmente fresca y limpia
       const suscripcion = await registro.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(PUBLIC_VAPID_KEY)
       });
+      
       return suscripcion.toJSON();
     } catch (error) {
       console.error('Error Web Push:', error);
