@@ -19,9 +19,8 @@ export default function Recepcion() {
   const [salas, setSalas] = useState([])
   const [cargando, setCargando] = useState(false)
   
-  // NUEVO: Estado para almacenar cuántas personas hay por delante en cada turno
   const [posiciones, setPosiciones] = useState({})
-  // NUEVO: Un disparador para recalcular la fila cuando cualquier turno avance
+  const [etadMins, setEtasMins] = useState({}) // NUEVO: Estado para guardar el tiempo estimado dinámico
   const [triggerPosiciones, setTriggerPosiciones] = useState(0)
   
   const [misTurnos, setMisTurnos] = useState(() => {
@@ -76,7 +75,6 @@ export default function Recepcion() {
         }
       }
       
-      // Forzamos recálculo de la fila al volver a la app
       setTriggerPosiciones(prev => prev + 1);
     }
 
@@ -84,7 +82,6 @@ export default function Recepcion() {
 
     const manejarVisibilidad = () => {
       if (document.visibilityState === 'visible') {
-        console.log("Pantalla encendida: Refrescando conexión y turnos con Supabase...");
         inicializarDatos();
       }
     };
@@ -101,14 +98,13 @@ export default function Recepcion() {
     localStorage.setItem('turnos_paciente', JSON.stringify(misTurnos))
   }, [misTurnos])
 
-  // 3. Suscripción Realtime (Modificada para el tracker de fila)
+  // 3. Suscripción Realtime
   useEffect(() => {
     const canalPaciente = supabase
       .channel('paciente-updates')
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'turnos' }, (payload) => {
         const turnoActualizado = payload.new
         
-        // REGLA NUEVA: Si algún paciente (sea quien sea) cambia de estado, recalculamos la fila
         if (['llamado', 'descartado', 'atendido'].includes(turnoActualizado.estado)) {
           setTriggerPosiciones(prev => prev + 1);
         }
@@ -133,7 +129,7 @@ export default function Recepcion() {
     return () => supabase.removeChannel(canalPaciente)
   }, []) 
 
-  // 4. WakeLock: Mantener pantalla encendida
+  // 4. WakeLock
   useEffect(() => {
     let wakeLock = null;
     const solicitarPantallaEncendida = async () => {
@@ -150,13 +146,15 @@ export default function Recepcion() {
 
   const turnosEnEspera = misTurnos.filter(t => t.estado === 'espera')
 
-  // 5. NUEVO: Cálculo dinámico de pacientes por delante
+  // 5. CÁLCULO DINÁMICO DE POSICIONES Y VELOCIDAD DE LA COLA (ETA)
   useEffect(() => {
-    const calcularPosiciones = async () => {
+    const calcularDatosCola = async () => {
       const nuevasPosiciones = {};
+      const nuevosEtas = {};
+
       for (const turno of turnosEnEspera) {
         try {
-          // Buscamos cuántos turnos en 'espera' tienen un ID menor al nuestro en la misma sala
+          // A. Contar cuántos hay por delante
           const { count, error } = await supabase
             .from('turnos')
             .select('*', { count: 'exact', head: true })
@@ -164,20 +162,56 @@ export default function Recepcion() {
             .eq('estado', 'espera')
             .lt('id', turno.id); 
             
-          if (!error) {
-            nuevasPosiciones[turno.id] = count || 0;
+          const personasAdelante = (!error && count !== null) ? count : 0;
+          nuevasPosiciones[turno.id] = personasAdelante;
+
+          // B. CÁLCULO DINÁMICO DE TIEMPO (Velocidad del médico)
+          // Obtenemos los últimos turnos ya procesados/llamados de esta cola para medir su ritmo real
+          const { data: historico } = await supabase
+            .from('turnos')
+            .select('created_at, updated_at')
+            .eq('cola_id', turno.cola_id)
+            .in('estado', ['llamado', 'atendido'])
+            .order('updated_at', { ascending: false })
+            .limit(5);
+
+          let minutosPorPaciente = 8; // Valor por defecto inicial (8 minutos si no hay historial)
+
+          if (historico && historico.length >= 2) {
+            let tiemposDiferencia = [];
+            for (let i = 0; i < historico.length - 1; i++) {
+              const t1 = new Date(historico[i].updated_at || historico[i].created_at);
+              const t2 = new Date(historico[i+1].updated_at || historico[i+1].created_at);
+              const diffMins = Math.abs(t1 - t2) / (1000 * 60);
+              // Filtramos valores lógicos (entre 1 min y 45 min por paciente para evitar picos raros)
+              if (diffMins > 1 && diffMins < 45) {
+                tiemposDiferencia.push(diffMins);
+              }
+            }
+
+            if (tiemposDiferencia.length > 0) {
+              const suma = tiemposDiferencia.reduce((a, b) => a + b, 0);
+              minutosPorPaciente = suma / tiemposDiferencia.length;
+            }
           }
+
+          // C. Multiplicamos las personas por delante por la velocidad real calculada
+          const minutosEstimados = Math.round(personasAdelante * minutosPorPaciente);
+          nuevosEtas[turno.id] = minutosEstimados;
+
         } catch (e) {
-          console.error("Error calculando posición", e);
+          console.error("Error calculando métricas de cola", e);
         }
       }
+
       setPosiciones(nuevasPosiciones);
+      setEtasMins(nuevosEtas);
     };
 
     if (turnosEnEspera.length > 0) {
-      calcularPosiciones();
+      calcularDatosCola();
     }
-  }, [turnosEnEspera.length, triggerPosiciones]); // Se recalcula cuando hay cambios de estado globales o en nuestros turnos
+  }, [turnosEnEspera.length, triggerPosiciones]); 
 
   const generarCodigo = () => {
     const caracteres = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
@@ -187,9 +221,7 @@ export default function Recepcion() {
   }
 
   const obtenerSuscripcionPush = async () => {
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-      return null;
-    }
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return null;
     try {
       const permiso = await Notification.requestPermission();
       if (permiso !== 'granted') return null;
@@ -228,7 +260,6 @@ export default function Recepcion() {
     if (!error && data && data.length > 0) {
       const nuevoTurno = { id: data[0].id, numero: nuevoCodigo, sala: sala.nombre, cola_id: sala.id, estado: 'espera' }
       setMisTurnos([...misTurnos, nuevoTurno])
-      // Refrescamos las posiciones al sacar un turno nuevo
       setTriggerPosiciones(prev => prev + 1);
     } else {
       alert('Error al solicitar el turno.')
@@ -238,7 +269,6 @@ export default function Recepcion() {
 
   const turnoLlamado = misTurnos.find(t => t.estado === 'llamado')
 
-  // NUEVOS ESTILOS
   const fondoAppStyles = {
     padding: '1.5rem',
     fontFamily: 'system-ui, -apple-system, sans-serif',
@@ -248,7 +278,6 @@ export default function Recepcion() {
     color: '#0f172a'
   }
 
-  // PANTALLA 1: TURNO LLAMADO
   if (turnoLlamado) {
     return (
       <div style={{ ...fondoAppStyles, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', backgroundColor: '#ecfdf5', backgroundImage: 'none' }}>
@@ -274,7 +303,6 @@ export default function Recepcion() {
     )
   }
 
-  // PANTALLA 2: DASHBOARD DEL PACIENTE
   return (
     <div style={fondoAppStyles}>
       
@@ -291,7 +319,6 @@ export default function Recepcion() {
       {turnosEnEspera.length > 0 && (
         <div style={{ marginBottom: '3rem', maxWidth: '400px', margin: '0 auto 3rem auto' }}>
           
-          {/* AVISO VISUAL IMPORTANTE (Ayuda a evitar bloqueos de pantalla) */}
           <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fef3c7', borderLeft: '4px solid #f59e0b', padding: '12px', borderRadius: '8px', marginBottom: '20px', fontSize: '0.9rem', color: '#92400e' }}>
             <strong>💡 Un consejo:</strong> Por favor, no cierre esta ventana. Su pantalla se mantendrá encendida para avisarle a tiempo.
           </div>
@@ -304,18 +331,30 @@ export default function Recepcion() {
                 <p style={{ margin: '0 0 5px 0', color: '#475569', fontSize: '1.1rem' }}>{turno.sala}</p>
                 <div style={{ fontSize: '4rem', fontWeight: 'bold', color: '#0284c7', letterSpacing: '2px', lineHeight: '1.1' }}>{turno.numero}</div>
                 
-                {/* --- NUEVO: CONTADOR DE PACIENTES POR DELANTE --- */}
-                <div style={{ marginTop: '20px', padding: '12px', backgroundColor: posiciones[turno.id] === 0 ? '#ecfdf5' : '#f8fafc', borderRadius: '10px', border: posiciones[turno.id] === 0 ? '1px solid #10b981' : '1px solid #e2e8f0', transition: 'all 0.3s' }}>
-                  <p style={{ margin: '0', fontSize: '0.85rem', color: '#64748b', textTransform: 'uppercase', fontWeight: '600' }}>
-                    Pacientes por delante
-                  </p>
-                  <p style={{ margin: '5px 0 0 0', fontSize: '2rem', fontWeight: 'bold', color: posiciones[turno.id] === 0 ? '#059669' : '#f59e0b' }}>
-                    {posiciones[turno.id] !== undefined ? posiciones[turno.id] : '-'}
-                  </p>
-                  {posiciones[turno.id] === 0 && (
-                    <p style={{ margin: '5px 0 0 0', fontSize: '0.9rem', color: '#059669', fontWeight: '700' }}>¡Prepárese, es el siguiente!</p>
-                  )}
+                {/* BLOQUE DE MÉTRICAS: POSICIÓN + ETA DINÁMICO */}
+                <div style={{ marginTop: '20px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  
+                  {/* Posición */}
+                  <div style={{ padding: '10px', backgroundColor: posiciones[turno.id] === 0 ? '#ecfdf5' : '#f8fafc', borderRadius: '10px', border: posiciones[turno.id] === 0 ? '1px solid #10b981' : '1px solid #e2e8f0' }}>
+                    <p style={{ margin: '0', fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', fontWeight: '600' }}>Adelante</p>
+                    <p style={{ margin: '5px 0 0 0', fontSize: '1.8rem', fontWeight: 'bold', color: posiciones[turno.id] === 0 ? '#059669' : '#f59e0b' }}>
+                      {posiciones[turno.id] !== undefined ? posiciones[turno.id] : '-'}
+                    </p>
+                  </div>
+
+                  {/* ETA Dinámico calculado */}
+                  <div style={{ padding: '10px', backgroundColor: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                    <p style={{ margin: '0', fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', fontWeight: '600' }}>Est. Espera</p>
+                    <p style={{ margin: '5px 0 0 0', fontSize: '1.8rem', fontWeight: 'bold', color: '#0284c7' }}>
+                      {etadMins[turno.id] !== undefined ? `${etadMins[turno.id]}m` : '-'}
+                    </p>
+                  </div>
+
                 </div>
+
+                {posiciones[turno.id] === 0 && (
+                  <p style={{ margin: '12px 0 0 0', fontSize: '0.9rem', color: '#059669', fontWeight: '700', backgroundColor: '#ecfdf5', padding: '8px', borderRadius: '6px' }}>¡Prepárese, es el siguiente!</p>
+                )}
                 {/* ------------------------------------------------ */}
 
                 <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'center' }}>
