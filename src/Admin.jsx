@@ -9,9 +9,14 @@ const generarCodigo = () => {
 }
 
 export default function Admin() {
+  // --- ESTADOS DE AUTENTICACIÓN ---
   const [autenticado, setAutenticado] = useState(false)
-  const [pin, setPin] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [errorAuth, setErrorAuth] = useState('')
+  const [cargandoAuth, setCargandoAuth] = useState(false)
 
+  // --- ESTADOS DE DATOS ---
   const [colas, setColas] = useState([])
   const [turnoActual, setTurnoActual] = useState({}) 
   const [esperaPorSala, setEsperaPorSala] = useState({}) 
@@ -19,6 +24,22 @@ export default function Admin() {
   const [creandoCola, setCreandoCola] = useState(false)
   const [cargandoCola, setCargandoCola] = useState(null)
 
+  // 1. EFECTO PARA CONTROLAR LA SESIÓN DE SUPABASE
+  useEffect(() => {
+    // Comprobar si hay una sesión activa al cargar la página
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setAutenticado(!!session)
+    })
+
+    // Escuchar cambios (cuando haces login o logout)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setAutenticado(!!session)
+    })
+
+    return () => subscription.unsubscribe()
+  }, [])
+
+  // 2. EFECTO PARA CARGAR LOS DATOS (Solo si estás autenticado)
   useEffect(() => {
     if (!autenticado) return
 
@@ -53,11 +74,31 @@ export default function Admin() {
     return () => supabase.removeChannel(canalAdmin)
   }, [autenticado])
 
-  const verificarPin = (e) => {
+  // --- FUNCIONES DE AUTENTICACIÓN ---
+  const handleLogin = async (e) => {
     e.preventDefault()
-    if (pin === '1234') { setAutenticado(true) } else { alert('PIN incorrecto.'); setPin('') }
+    setCargandoAuth(true)
+    setErrorAuth('')
+    
+    const { error } = await supabase.auth.signInWithPassword({
+      email: email,
+      password: password,
+    })
+
+    if (error) {
+      setErrorAuth('Credenciales incorrectas. Verifica el correo y la contraseña.')
+    }
+    setCargandoAuth(false)
   }
 
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
+    // Limpiamos los campos del formulario al salir
+    setEmail('')
+    setPassword('')
+  }
+
+  // --- FUNCIONES DE BASE DE DATOS ---
   const crearNuevaConsulta = async () => {
     if (!nuevaConsulta.trim()) return
     setCreandoCola(true)
@@ -116,17 +157,12 @@ export default function Admin() {
     setCargandoCola(null)
   }
 
-  // =========================================================
-  // PARSEO SEGURO DE LA SUSCRIPCIÓN Y ENVÍO A EDGE FUNCTION
-  // =========================================================
   const dispararPush = async (suscripcion, nombreSala, numero, tipoAlerta = 'llamado') => {
     try {
-      // Convertimos el string que viene de la BD a un Objeto puro
       const suscripcionObj = typeof suscripcion === 'string' 
         ? JSON.parse(suscripcion) 
         : suscripcion;
 
-      // Enviamos el objeto ya limpio a la Edge Function
       await supabase.functions.invoke('enviar-alerta', {
         body: { suscripcion: suscripcionObj, sala: nombreSala, numero: numero, tipo: tipoAlerta }
       })
@@ -138,7 +174,6 @@ export default function Admin() {
   const llamarSiguiente = async (salaId) => {
     setCargandoCola(salaId)
     
-    // Obtenemos los 4 siguientes en espera
     const { data: turnosEspera, error: errorBusqueda } = await supabase
       .from('turnos').select('*').eq('cola_id', salaId).eq('estado', 'espera')
       .order('created_at', { ascending: true }).limit(4)
@@ -155,23 +190,14 @@ export default function Admin() {
       
       const sala = colas.find(c => c.id === salaId)
 
-      // 1. Notificamos al paciente que le toca entrar (aviso normal)
       if (turnoALlamar.suscripcion_push) {
         dispararPush(turnoALlamar.suscripcion_push, sala.nombre, turnoALlamar.numero, 'llamado')
       }
 
-      // 2. Pre-aviso al paciente en 4ª posición (el que tiene 3 personas por delante)
       const pacientePreaviso = turnosEspera[3]; 
       if (pacientePreaviso && pacientePreaviso.suscripcion_push && !pacientePreaviso.preaviso_enviado) {
-        
-        // Enviamos el Push silencioso
         dispararPush(pacientePreaviso.suscripcion_push, sala.nombre, pacientePreaviso.numero, 'preaviso')
-        
-        // Actualizamos el interruptor en Supabase para no volver a notificarle
-        await supabase
-          .from('turnos')
-          .update({ preaviso_enviado: true })
-          .eq('id', pacientePreaviso.id);
+        await supabase.from('turnos').update({ preaviso_enviado: true }).eq('id', pacientePreaviso.id);
       }
 
     } else {
@@ -203,29 +229,51 @@ export default function Admin() {
     setCargandoCola(null)
   }
 
+  // --- INTERFAZ: PANTALLA DE LOGIN ---
   if (!autenticado) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: 'linear-gradient(135deg, #0f172a 0%, #020617 100%)', fontFamily: 'system-ui, sans-serif' }}>
-        <form onSubmit={verificarPin} style={{ backgroundColor: 'rgba(30, 41, 59, 0.7)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.05)', padding: '4rem 3rem', borderRadius: '24px', textAlign: 'center', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.8)' }}>
-          <div style={{ marginBottom: '2rem' }}><span style={{ fontSize: '3rem' }}>🩺</span></div>
-          <h2 style={{ color: '#f8fafc', marginBottom: '2.5rem', fontWeight: '500', letterSpacing: '1px' }}>Acceso Médico</h2>
+        <form onSubmit={handleLogin} style={{ backgroundColor: 'rgba(30, 41, 59, 0.7)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.05)', padding: '3.5rem 3rem', borderRadius: '24px', textAlign: 'center', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.8)' }}>
+          <div style={{ marginBottom: '1.5rem' }}><span style={{ fontSize: '3rem' }}>🩺</span></div>
+          <h2 style={{ color: '#f8fafc', marginBottom: '2rem', fontWeight: '500', letterSpacing: '1px' }}>Acceso Médico</h2>
+          
           <input 
-            type="password" placeholder="****" value={pin} onChange={(e) => setPin(e.target.value)}
-            style={{ padding: '15px', fontSize: '2rem', width: '220px', textAlign: 'center', borderRadius: '12px', border: '2px solid rgba(255,255,255,0.1)', backgroundColor: 'rgba(15, 23, 42, 0.6)', color: 'white', marginBottom: '2.5rem', letterSpacing: '8px', outline: 'none', transition: 'border-color 0.3s' }}
+            type="email" placeholder="Correo electrónico" value={email} onChange={(e) => setEmail(e.target.value)} required
+            style={{ padding: '15px', fontSize: '1.1rem', width: '280px', borderRadius: '12px', border: '2px solid rgba(255,255,255,0.1)', backgroundColor: 'rgba(15, 23, 42, 0.6)', color: 'white', marginBottom: '1rem', outline: 'none', transition: 'border-color 0.3s', boxSizing: 'border-box' }}
             onFocus={(e) => e.target.style.borderColor = '#38bdf8'} onBlur={(e) => e.target.style.borderColor = 'rgba(255,255,255,0.1)'} autoFocus
           />
+          
           <br />
-          <button type="submit" style={{ padding: '16px 40px', background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)', color: 'white', border: 'none', borderRadius: '12px', fontSize: '1.2rem', cursor: 'pointer', fontWeight: 'bold', width: '100%', boxShadow: '0 4px 15px rgba(37, 99, 235, 0.3)', transition: 'transform 0.1s' }} onMouseDown={(e) => e.target.style.transform = 'scale(0.98)'} onMouseUp={(e) => e.target.style.transform = 'scale(1)'}>
-            Entrar al Panel
+
+          <input 
+            type="password" placeholder="Contraseña" value={password} onChange={(e) => setPassword(e.target.value)} required
+            style={{ padding: '15px', fontSize: '1.1rem', width: '280px', borderRadius: '12px', border: '2px solid rgba(255,255,255,0.1)', backgroundColor: 'rgba(15, 23, 42, 0.6)', color: 'white', marginBottom: '1.5rem', outline: 'none', transition: 'border-color 0.3s', boxSizing: 'border-box' }}
+            onFocus={(e) => e.target.style.borderColor = '#38bdf8'} onBlur={(e) => e.target.style.borderColor = 'rgba(255,255,255,0.1)'}
+          />
+          
+          <br />
+
+          {errorAuth && <p style={{ color: '#ef4444', marginBottom: '1.5rem', fontSize: '0.9rem', maxWidth: '280px', margin: '0 auto 1.5rem auto' }}>{errorAuth}</p>}
+          
+          <button type="submit" disabled={cargandoAuth} style={{ padding: '16px 40px', background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)', color: 'white', border: 'none', borderRadius: '12px', fontSize: '1.1rem', cursor: cargandoAuth ? 'not-allowed' : 'pointer', fontWeight: 'bold', width: '100%', boxShadow: '0 4px 15px rgba(37, 99, 235, 0.3)', transition: 'transform 0.1s', opacity: cargandoAuth ? 0.7 : 1 }} onMouseDown={(e) => !cargandoAuth && (e.target.style.transform = 'scale(0.98)')} onMouseUp={(e) => !cargandoAuth && (e.target.style.transform = 'scale(1)')}>
+            {cargandoAuth ? 'Verificando...' : 'Entrar al Panel'}
           </button>
         </form>
       </div>
     )
   }
 
+  // --- INTERFAZ: PANTALLA PRINCIPAL (AUTENTICADO) ---
   return (
     <div style={{ padding: '2rem', fontFamily: 'system-ui, sans-serif', background: '#0f172a', minHeight: '100vh' }}>
-      <header style={{ textAlign: 'center', marginBottom: '3rem', marginTop: '1rem' }}>
+      <header style={{ textAlign: 'center', marginBottom: '3rem', marginTop: '1rem', position: 'relative' }}>
+        {/* BOTÓN DE CERRAR SESIÓN */}
+        <div style={{ position: 'absolute', right: '0', top: '0' }}>
+          <button onClick={handleLogout} style={{ padding: '8px 16px', backgroundColor: 'transparent', border: '1px solid #475569', color: '#94a3b8', borderRadius: '8px', cursor: 'pointer', transition: 'all 0.2s', fontSize: '0.9rem' }} onMouseOver={(e) => { e.target.style.backgroundColor = '#1e293b'; e.target.style.color = '#f8fafc' }} onMouseOut={(e) => { e.target.style.backgroundColor = 'transparent'; e.target.style.color = '#94a3b8' }}>
+            Cerrar Sesión
+          </button>
+        </div>
+
         <h1 style={{ color: '#f8fafc', fontSize: '2.5rem', margin: '0 0 10px 0', fontWeight: '800' }}>Panel de Administración</h1>
         <p style={{ color: '#94a3b8', fontSize: '1.2rem', margin: 0, fontWeight: '500' }}>Gestión avanzada de salas y turnos</p>
       </header>
