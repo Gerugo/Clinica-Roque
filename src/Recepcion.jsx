@@ -20,7 +20,7 @@ export default function Recepcion() {
   const [cargando, setCargando] = useState(false)
   
   const [posiciones, setPosiciones] = useState({})
-  const [etadMins, setEtasMins] = useState({}) // NUEVO: Estado para guardar el tiempo estimado dinámico
+  const [etadMins, setEtasMins] = useState({}) // Estado para guardar el tiempo estimado dinámico
   const [triggerPosiciones, setTriggerPosiciones] = useState(0)
   
   const [misTurnos, setMisTurnos] = useState(() => {
@@ -146,7 +146,7 @@ export default function Recepcion() {
 
   const turnosEnEspera = misTurnos.filter(t => t.estado === 'espera')
 
-  // 5. CÁLCULO DINÁMICO DE POSICIONES Y VELOCIDAD DE LA COLA (ETA)
+  // 5. CÁLCULO DINÁMICO DE POSICIONES Y VELOCIDAD DE LA COLA (ETA) NIVEL DIOS
   useEffect(() => {
     const calcularDatosCola = async () => {
       const nuevasPosiciones = {};
@@ -154,7 +154,7 @@ export default function Recepcion() {
 
       for (const turno of turnosEnEspera) {
         try {
-          // A. Contar cuántos hay por delante
+          // A. Contar cuántos hay por delante en la sala de espera (físicamente esperando)
           const { count, error } = await supabase
             .from('turnos')
             .select('*', { count: 'exact', head: true })
@@ -165,8 +165,7 @@ export default function Recepcion() {
           const personasAdelante = (!error && count !== null) ? count : 0;
           nuevasPosiciones[turno.id] = personasAdelante;
 
-          // B. CÁLCULO DINÁMICO DE TIEMPO (Velocidad del médico)
-          // Obtenemos los últimos turnos ya procesados/llamados de esta cola para medir su ritmo real
+          // B. CÁLCULO DINÁMICO DE TIEMPO (Velocidad media del médico hoy)
           const { data: historico } = await supabase
             .from('turnos')
             .select('created_at, updated_at')
@@ -175,7 +174,7 @@ export default function Recepcion() {
             .order('updated_at', { ascending: false })
             .limit(5);
 
-          let minutosPorPaciente = 8; // Valor por defecto inicial (8 minutos si no hay historial)
+          let minutosPorPaciente = 8; // Valor por defecto inicial
 
           if (historico && historico.length >= 2) {
             let tiemposDiferencia = [];
@@ -183,7 +182,7 @@ export default function Recepcion() {
               const t1 = new Date(historico[i].updated_at || historico[i].created_at);
               const t2 = new Date(historico[i+1].updated_at || historico[i+1].created_at);
               const diffMins = Math.abs(t1 - t2) / (1000 * 60);
-              // Filtramos valores lógicos (entre 1 min y 45 min por paciente para evitar picos raros)
+              // Filtramos valores lógicos para evitar picos raros
               if (diffMins > 1 && diffMins < 45) {
                 tiemposDiferencia.push(diffMins);
               }
@@ -195,8 +194,32 @@ export default function Recepcion() {
             }
           }
 
-          // C. Multiplicamos las personas por delante por la velocidad real calculada
-          const minutosEstimados = Math.round(personasAdelante * minutosPorPaciente);
+          // C. LA MAGIA: Calcular el tiempo de la persona que está DENTRO de la consulta
+          let tiempoRestanteActual = 0;
+          const { data: pacienteDentro } = await supabase
+            .from('turnos')
+            .select('updated_at')
+            .eq('cola_id', turno.cola_id)
+            .eq('estado', 'llamado')
+            .order('updated_at', { ascending: false })
+            .limit(1);
+
+          if (pacienteDentro && pacienteDentro.length > 0) {
+            const horaEntrada = new Date(pacienteDentro[0].updated_at).getTime();
+            const horaActual = new Date().getTime();
+            
+            // Calculamos cuántos minutos reales lleva el paciente dentro de la consulta
+            const minutosDentro = (horaActual - horaEntrada) / 60000;
+            
+            // Si el promedio son 15 min y lleva 10, le quedan 5.
+            // Usamos Math.max(0, ...) para que si se alarga más del promedio, no reste minutos negativos.
+            tiempoRestanteActual = Math.max(0, minutosPorPaciente - minutosDentro);
+          }
+
+          // D. CÁLCULO FINAL: Tiempo de los de la sala de espera + el tiempo del de dentro
+          const tiempoEnSala = personasAdelante * minutosPorPaciente;
+          const minutosEstimados = Math.round(tiempoEnSala + tiempoRestanteActual);
+          
           nuevosEtas[turno.id] = minutosEstimados;
 
         } catch (e) {
