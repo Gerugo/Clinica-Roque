@@ -22,7 +22,13 @@ function App() {
           path="/" 
           element={modoKiosco ? <Navigate to="/recepcion" replace /> : <Pantalla />} 
         />
-        <Route path="/admin" element={<Admin />} />
+        
+        {/* BLINDAJE AÑADIDO: Si estás en la PWA y tratas de ir a /admin, te devuelve a recepción */}
+        <Route 
+          path="/admin" 
+          element={modoKiosco ? <Navigate to="/recepcion" replace /> : <Admin />} 
+        />
+        
         <Route path="/recepcion" element={<Recepcion />} />
       </Routes>
     </BrowserRouter>
