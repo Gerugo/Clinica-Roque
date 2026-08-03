@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from './supabase.js'
 import InstallButton from './InstallButton'
 
-const PUBLIC_VAPID_KEY = 'BLwFdwnK3Qh0TUVGdSu0uSIJltf6pMpybCqagPIzWiTL4ZSlQjgeUnIFlqXHM3vnCemBDcCgmd_uTICoNhIN2gQ';
+const PUBLIC_VAPID_KEY = 'BGHmKycJbLHBjay-25jQURBSW1-SELwwHh4EnZ57-GhCEw4zvW1zFhvbqw2H9neaFPUrGSy3IqzAwNqDxscOxMw';
 
 function urlBase64ToUint8Array(base64String) {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);

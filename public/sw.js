@@ -15,28 +15,39 @@ self.addEventListener('push', (event) => {
   // Datos por defecto ultra-seguros
   let data = { 
     title: '¡Es su turno!', 
-    body: 'Por favor, acuda a la consulta indicada en la pantalla.' 
+    body: 'Por favor, acuda a la consulta indicada en la pantalla.',
+    tipo: 'llamado' // <-- AÑADIDO: asume por defecto que es el turno real
   };
 
   try {
     if (event.data) {
-      // Intentamos parsear. Tu Edge Function DEBE enviar un JSON con 'title' y 'body'
+      // Intentamos parsear. Tu Edge Function envía un JSON con 'title', 'body' y 'tipo'
       const parsedData = event.data.json();
       if (parsedData.title) data.title = parsedData.title;
       if (parsedData.body) data.body = parsedData.body;
+      if (parsedData.tipo) data.tipo = parsedData.tipo; // <-- AÑADIDO: capturamos el tipo
     }
   } catch (e) {
     console.error('El payload de Supabase no es un JSON válido, usando textos por defecto.', e);
   }
 
+  // --- LÓGICA DE UX: Evaluamos si es un preaviso o el llamado final ---
+  const esPreaviso = data.tipo === 'preaviso';
+
   const opciones = {
     body: data.body,
     icon: '/pwa-192x192.png', // CRÍTICO: Da legitimidad a la notificación en Android
     badge: '/pwa-192x192.png', // CRÍTICO: Icono monocromo para la barra superior
-    vibrate: [500, 200, 500, 200, 500], // Patrón más agresivo para pantallas bloqueadas
+    
+    // MODIFICADO: Vibración suave si es preaviso, agresiva si es el turno real
+    vibrate: esPreaviso ? [200, 100, 200] : [500, 200, 500, 200, 500], 
+    
     tag: 'turno-alerta', 
     renotify: true,
-    requireInteraction: true, 
+    
+    // MODIFICADO: El preaviso no bloquea la pantalla eternamente, el turno real sí
+    requireInteraction: !esPreaviso, 
+    
     data: {
       url: '/recepcion' 
     }
