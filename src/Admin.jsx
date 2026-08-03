@@ -117,16 +117,16 @@ export default function Admin() {
   }
 
   // =========================================================
-  // EL FIX: PARSEO SEGURO DE LA SUSCRIPCIÓN
+  // PARSEO SEGURO DE LA SUSCRIPCIÓN Y ENVÍO A EDGE FUNCTION
   // =========================================================
   const dispararPush = async (suscripcion, nombreSala, numero, tipoAlerta = 'llamado') => {
     try {
-      // 1. Convertimos el string que viene de la BD a un Objeto puro
+      // Convertimos el string que viene de la BD a un Objeto puro
       const suscripcionObj = typeof suscripcion === 'string' 
         ? JSON.parse(suscripcion) 
         : suscripcion;
 
-      // 2. Enviamos el objeto ya limpio a la Edge Function
+      // Enviamos el objeto ya limpio a la Edge Function
       await supabase.functions.invoke('enviar-alerta', {
         body: { suscripcion: suscripcionObj, sala: nombreSala, numero: numero, tipo: tipoAlerta }
       })
@@ -138,6 +138,7 @@ export default function Admin() {
   const llamarSiguiente = async (salaId) => {
     setCargandoCola(salaId)
     
+    // Obtenemos los 4 siguientes en espera
     const { data: turnosEspera, error: errorBusqueda } = await supabase
       .from('turnos').select('*').eq('cola_id', salaId).eq('estado', 'espera')
       .order('created_at', { ascending: true }).limit(4)
@@ -154,15 +155,23 @@ export default function Admin() {
       
       const sala = colas.find(c => c.id === salaId)
 
-      // Notificamos al que le toca entrar
+      // 1. Notificamos al paciente que le toca entrar (aviso normal)
       if (turnoALlamar.suscripcion_push) {
         dispararPush(turnoALlamar.suscripcion_push, sala.nombre, turnoALlamar.numero, 'llamado')
       }
 
-      // Pre-aviso al paciente en 3ª posición
+      // 2. Pre-aviso al paciente en 4ª posición (el que tiene 3 personas por delante)
       const pacientePreaviso = turnosEspera[3]; 
-      if (pacientePreaviso && pacientePreaviso.suscripcion_push) {
+      if (pacientePreaviso && pacientePreaviso.suscripcion_push && !pacientePreaviso.preaviso_enviado) {
+        
+        // Enviamos el Push silencioso
         dispararPush(pacientePreaviso.suscripcion_push, sala.nombre, pacientePreaviso.numero, 'preaviso')
+        
+        // Actualizamos el interruptor en Supabase para no volver a notificarle
+        await supabase
+          .from('turnos')
+          .update({ preaviso_enviado: true })
+          .eq('id', pacientePreaviso.id);
       }
 
     } else {
