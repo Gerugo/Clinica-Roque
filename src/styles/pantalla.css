@@ -1,0 +1,208 @@
+/* ==========================================================================
+   PANTALLA DE SALA DE ESPERA (TV) - ESTILOS
+   ========================================================================== */
+
+@keyframes latido {
+  0% {
+    transform: scale(1);
+    text-shadow: 0 0 20px rgba(197, 160, 89, 0.4);
+  }
+  50% {
+    transform: scale(1.03);
+    text-shadow: 0 0 45px rgba(197, 160, 89, 0.7);
+  }
+  100% {
+    transform: scale(1);
+    text-shadow: 0 0 20px rgba(197, 160, 89, 0.4);
+  }
+}
+
+.pantalla-container {
+  position: fixed;
+  inset: 0;
+  background-image: url(/1785611890284.png);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-color: #14191e;
+  color: #fff;
+  overflow: hidden;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  padding: 4vh 4vw;
+}
+
+/* Modal Activación de Audio Inicial */
+.pantalla-audio-gate {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 25, 30, 0.88);
+  backdrop-filter: blur(15px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  text-align: center;
+  padding: 2vw;
+}
+
+.pantalla-audio-gate-title {
+  font-size: min(4rem, 8vw);
+  color: var(--gold-400);
+  margin-bottom: 2vh;
+  font-weight: 300;
+  letter-spacing: 4px;
+}
+
+.pantalla-audio-gate-desc {
+  font-size: min(1.8rem, 3.5vw);
+  color: var(--gold-sage);
+  margin-bottom: 4vh;
+}
+
+.pantalla-audio-gate-btn {
+  padding: 3vh 6vw;
+  font-size: min(2.4rem, 5vw);
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--gold-400) 0%, var(--gold-500) 100%);
+  color: #1a1c23;
+  border-radius: var(--radius-lg);
+  box-shadow: 0 10px 25px rgba(197, 160, 89, 0.3);
+  transition: transform 0.1s ease;
+}
+
+.pantalla-audio-gate-btn:hover {
+  transform: scale(1.03);
+}
+
+/* Overlay de Turno Llamado Activo */
+.pantalla-overlay-llamada {
+  position: fixed;
+  inset: 0;
+  background: rgba(26, 30, 36, 0.92);
+  backdrop-filter: blur(25px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  z-index: 100;
+  text-align: center;
+  padding: 2rem;
+}
+
+.pantalla-overlay-subtitle {
+  font-size: 5vw;
+  color: var(--gold-sage);
+  margin: 0 0 2vh 0;
+  letter-spacing: 12px;
+  text-transform: uppercase;
+  font-weight: 400;
+}
+
+.pantalla-overlay-number {
+  font-size: 28vw;
+  font-weight: 900;
+  color: var(--gold-400);
+  line-height: 0.95;
+  animation: latido 1.5s infinite ease-in-out;
+  font-family: var(--font-mono);
+}
+
+.pantalla-overlay-instruction {
+  font-size: 5.5vw;
+  color: #f3f4f6;
+  margin: 3vh 0 0 0;
+  font-weight: 300;
+  letter-spacing: 2px;
+}
+
+.pantalla-overlay-room-name {
+  color: var(--gold-400);
+  font-weight: 700;
+}
+
+/* Encabezado */
+.pantalla-header {
+  text-align: center;
+  margin-bottom: 4vh;
+  flex-shrink: 0;
+}
+
+.pantalla-header-title {
+  font-size: min(1.8rem, 3.5vh);
+  color: var(--gold-400);
+  margin: 0;
+  letter-spacing: 6px;
+  font-weight: 400;
+  text-transform: uppercase;
+}
+
+/* Grid de Salas */
+.pantalla-grid-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  width: 100%;
+}
+
+.pantalla-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 2.5vw;
+  width: 100%;
+  max-width: 95vw;
+  margin: 0 auto;
+  align-content: center;
+}
+
+.pantalla-room-card {
+  background: rgba(30, 35, 42, 0.6);
+  backdrop-filter: blur(14px);
+  border-radius: var(--radius-xl);
+  padding: 4vh 2vw;
+  text-align: center;
+  border: 1px solid rgba(197, 160, 89, 0.25);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  transition: transform 0.3s ease, border-color 0.3s ease;
+}
+
+.pantalla-room-title {
+  font-size: min(2.5rem, 4.5vh);
+  color: #e5e7eb;
+  margin: 0 0 1.5vh 0;
+  font-weight: 400;
+  letter-spacing: 1px;
+}
+
+.pantalla-room-divider {
+  width: 60px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--gold-400), transparent);
+  margin: 0 auto 2vh auto;
+}
+
+.pantalla-room-number {
+  font-size: min(7rem, 12vh);
+  font-weight: 900;
+  color: var(--gold-400);
+  letter-spacing: 4px;
+  margin: 1.5vh 0;
+  line-height: 1;
+  font-family: var(--font-mono);
+  text-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+}
+
+.pantalla-room-badge {
+  font-size: min(1.3rem, 2.5vh);
+  color: var(--gold-sage);
+  margin: 2vh 0 0 0;
+  text-transform: uppercase;
+  letter-spacing: 3px;
+  font-weight: 600;
+}

@@ -1,0 +1,323 @@
+/* ==========================================================================
+   VISTA DE PACIENTE (RECEPCIÓN / MÓVIL / PWA) - ESTILOS
+   ========================================================================== */
+
+.recepcion-container {
+  padding: 1.5rem;
+  min-height: 100vh;
+  background-color: #f8fafc;
+  background-image: radial-gradient(circle at top right, #e0f2fe 0%, #f8fafc 40%, #f1f5f9 100%);
+  color: var(--slate-900);
+}
+
+.recepcion-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.recepcion-logo {
+  width: 72px;
+  height: 72px;
+  border-radius: var(--radius-lg);
+  margin-bottom: 0.75rem;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+}
+
+.recepcion-title {
+  margin: 0;
+  color: var(--slate-900);
+  font-size: 1.75rem;
+  font-weight: 800;
+}
+
+.recepcion-subtitle {
+  margin: 4px 0 0 0;
+  color: var(--slate-600);
+  font-size: 1rem;
+}
+
+/* Pantalla de Turno Llamado Activo (¡ES SU TURNO!) */
+.recepcion-called-screen {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background-color: var(--success-50);
+  text-align: center;
+  padding: 2rem;
+}
+
+.recepcion-called-badge {
+  background-color: var(--success-500);
+  color: white;
+  padding: 8px 20px;
+  border-radius: 30px;
+  font-weight: 800;
+  font-size: 1.1rem;
+  letter-spacing: 1px;
+  margin-bottom: 1.5rem;
+  animation: pulse 1.5s infinite;
+}
+
+.recepcion-called-number {
+  font-size: 6.5rem;
+  font-weight: 900;
+  color: var(--success-600);
+  line-height: 1;
+  letter-spacing: 4px;
+  font-family: var(--font-mono);
+  margin: 0.5rem 0;
+}
+
+.recepcion-called-room {
+  font-size: 1.6rem;
+  color: var(--slate-800);
+  margin-top: 1rem;
+  font-weight: 600;
+}
+
+.recepcion-called-room strong {
+  color: var(--success-600);
+  font-weight: 800;
+}
+
+.recepcion-called-instruction {
+  color: var(--slate-600);
+  font-size: 1.05rem;
+  margin-top: 0.75rem;
+  max-width: 320px;
+}
+
+/* Tarjeta de Turno en Espera */
+.recepcion-active-tickets {
+  max-width: 420px;
+  margin: 0 auto 2.5rem auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.recepcion-ticket-card {
+  background: white;
+  border-radius: var(--radius-xl);
+  padding: 1.75rem;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--slate-200);
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.recepcion-ticket-card-header {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--slate-700);
+  margin-bottom: 0.5rem;
+}
+
+.recepcion-ticket-number {
+  font-size: 4.5rem;
+  font-weight: 900;
+  color: var(--sky-600);
+  line-height: 1;
+  letter-spacing: 3px;
+  font-family: var(--font-mono);
+  margin: 0.5rem 0 1rem 0;
+}
+
+/* Métricas de Cola / ETA */
+.recepcion-metrics-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  background-color: var(--slate-50);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  margin-top: 1rem;
+  border: 1px solid var(--slate-200);
+}
+
+.recepcion-metric-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.recepcion-metric-val {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--slate-800);
+  line-height: 1.2;
+}
+
+.recepcion-metric-label {
+  font-size: 0.8rem;
+  color: var(--slate-600);
+  font-weight: 600;
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+
+.recepcion-next-badge {
+  margin: 12px 0 0 0;
+  font-size: 0.95rem;
+  color: var(--success-600);
+  font-weight: 700;
+  background-color: var(--success-50);
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+/* Botones de Selección de Sala */
+.recepcion-selector-container {
+  max-width: 420px;
+  margin: 0 auto;
+}
+
+.recepcion-selector-title {
+  text-align: center;
+  color: var(--slate-700);
+  margin-bottom: 1.25rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.recepcion-room-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.recepcion-room-btn {
+  padding: 18px 20px;
+  border-radius: var(--radius-lg);
+  font-size: 1.15rem;
+  font-weight: 700;
+  border: 1px solid var(--slate-200);
+  background-color: white;
+  color: var(--slate-900);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.04);
+  transition: all 0.2s ease;
+  text-align: center;
+}
+
+.recepcion-room-btn:hover:not(:disabled) {
+  border-color: var(--sky-400);
+  box-shadow: 0 6px 12px -2px rgba(2, 132, 199, 0.12);
+  transform: translateY(-1px);
+}
+
+.recepcion-room-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.recepcion-room-btn-active {
+  background-color: var(--slate-100);
+  border-color: var(--slate-200);
+  color: var(--slate-400);
+}
+
+.recepcion-room-btn-badge {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--sky-600);
+  margin-top: 4px;
+  font-weight: 500;
+}
+
+/* Recuperación de Turnos */
+.recepcion-recovery-section {
+  max-width: 420px;
+  margin: 2rem auto 0 auto;
+  text-align: center;
+}
+
+.recepcion-recovery-toggle-btn {
+  background: none;
+  color: var(--slate-600);
+  font-size: 0.9rem;
+  text-decoration: underline;
+  padding: 8px;
+}
+
+.recepcion-recovery-box {
+  background: white;
+  padding: 1.5rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--slate-200);
+  text-align: left;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
+}
+
+.recepcion-recovery-title {
+  margin: 0 0 12px 0;
+  font-weight: 700;
+  color: var(--slate-800);
+}
+
+.recepcion-recovery-select,
+.recepcion-recovery-input {
+  width: 100%;
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--slate-200);
+  margin-bottom: 10px;
+  font-size: 1rem;
+}
+
+.recepcion-recovery-input {
+  text-transform: uppercase;
+  letter-spacing: 3px;
+  text-align: center;
+  font-weight: bold;
+}
+
+.recepcion-recovery-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.recepcion-recovery-submit-btn {
+  flex: 1;
+  padding: 12px;
+  background-color: var(--sky-600);
+  color: white;
+  border-radius: var(--radius-sm);
+  font-weight: 700;
+}
+
+.recepcion-recovery-cancel-btn {
+  padding: 12px 18px;
+  background-color: var(--slate-100);
+  color: var(--slate-700);
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+}
+
+/* Banner de Instalación PWA */
+.recepcion-pwa-banner-ios {
+  background-color: var(--slate-800);
+  padding: 14px 18px;
+  border-radius: var(--radius-md);
+  color: white;
+  text-align: center;
+  margin: 1.5rem auto;
+  max-width: 420px;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.recepcion-pwa-banner-btn {
+  background-color: var(--sky-400);
+  color: var(--slate-900);
+  padding: 12px 24px;
+  border-radius: var(--radius-md);
+  font-size: 1rem;
+  font-weight: 700;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+  margin: 1.5rem auto;
+  display: block;
+}
