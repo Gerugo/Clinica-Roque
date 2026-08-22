@@ -14,11 +14,13 @@ import {
 } from '../../services/tickets.js'
 import { LoginForm } from './LoginForm.jsx'
 import { RoomCard } from './RoomCard.jsx'
+import { AnalyticsDashboard } from './AnalyticsDashboard.jsx'
 import '../../styles/admin.css'
 
 export function AdminDashboard() {
   const { autenticado, cargando: cargandoAuth, errorAuth, procesandoLogin, login, logout } = useAuth()
 
+  const [tabActiva, setTabActiva] = useState('salas') // 'salas' | 'analytics'
   const [colas, setColas] = useState([])
   const [turnoActual, setTurnoActual] = useState({})
   const [esperaPorSala, setEsperaPorSala] = useState({})
@@ -54,7 +56,7 @@ export function AdminDashboard() {
     }
   }, [autenticado])
 
-  // 2. Suscripción Realtime completa (INSERT, UPDATE, DELETE) para mantener colas sincronizadas entre todos los médicos
+  // 2. Suscripción Realtime completa (INSERT, UPDATE, DELETE)
   useRealtimeSubscription({
     channelName: 'admin-turnos-realtime',
     table: 'turnos',
@@ -71,10 +73,8 @@ export function AdminDashboard() {
           }))
         }
       } else if (eventType === 'UPDATE') {
-        // Si cambió el estado de un turno
         if (nuevo.estado === 'llamado') {
           setTurnoActual((prev) => ({ ...prev, [nuevo.cola_id]: nuevo }))
-          // Reducir espera si venía de espera
           if (anterior?.estado === 'espera' || !anterior?.estado) {
             setEsperaPorSala((prev) => ({
               ...prev,
@@ -202,44 +202,68 @@ export function AdminDashboard() {
         </button>
 
         <h1 className="admin-header-title">Panel de Administración</h1>
-        <p className="admin-header-sub">Gestión avanzada de salas y turnos médicos</p>
+        <p className="admin-header-sub">Gestión avanzada de salas y métricas clínicas</p>
       </header>
 
-      {/* Formulario Añadir Sala */}
-      <form onSubmit={handleCrearSala} className="admin-add-room-bar">
-        <input
-          type="text"
-          placeholder="Nombre de la nueva sala (Ej: Consulta 3 - Traumatología)..."
-          value={nuevaConsulta}
-          onChange={(e) => setNuevaConsulta(e.target.value)}
-          className="admin-input-text"
-        />
+      {/* Navegación por Pestañas */}
+      <nav className="admin-tab-nav" aria-label="Secciones del panel">
         <button
-          type="submit"
-          disabled={creandoCola || !nuevaConsulta.trim()}
-          className="admin-btn-primary"
+          onClick={() => setTabActiva('salas')}
+          className={`admin-tab-btn ${tabActiva === 'salas' ? 'admin-tab-btn-active' : ''}`}
         >
-          {creandoCola ? 'Creando...' : '+ Añadir Sala'}
+          🩺 Salas y Turnos
         </button>
-      </form>
+        <button
+          onClick={() => setTabActiva('analytics')}
+          className={`admin-tab-btn ${tabActiva === 'analytics' ? 'admin-tab-btn-active' : ''}`}
+        >
+          📊 Analítica y KPIs
+        </button>
+      </nav>
 
-      {/* Grid de Salas */}
-      <div className="admin-rooms-grid">
-        {colas.map((sala) => (
-          <RoomCard
-            key={sala.id}
-            sala={sala}
-            turnoActual={turnoActual[sala.id]}
-            enEspera={esperaPorSala[sala.id] || 0}
-            estaCargando={cargandoSalaId === sala.id}
-            onLlamarSiguiente={handleLlamarSiguiente}
-            onReLlamar={handleReLlamar}
-            onDescartar={handleDescartar}
-            onImprimirPapel={handleImprimirPapel}
-            onEliminarSala={handleEliminarSala}
-          />
-        ))}
-      </div>
+      {/* Pestaña 1: Gestión de Salas */}
+      {tabActiva === 'salas' && (
+        <>
+          {/* Formulario Añadir Sala */}
+          <form onSubmit={handleCrearSala} className="admin-add-room-bar">
+            <input
+              type="text"
+              placeholder="Nombre de la nueva sala (Ej: Consulta 3 - Traumatología)..."
+              value={nuevaConsulta}
+              onChange={(e) => setNuevaConsulta(e.target.value)}
+              className="admin-input-text"
+            />
+            <button
+              type="submit"
+              disabled={creandoCola || !nuevaConsulta.trim()}
+              className="admin-btn-primary"
+            >
+              {creandoCola ? 'Creando...' : '+ Añadir Sala'}
+            </button>
+          </form>
+
+          {/* Grid de Salas */}
+          <div className="admin-rooms-grid">
+            {colas.map((sala) => (
+              <RoomCard
+                key={sala.id}
+                sala={sala}
+                turnoActual={turnoActual[sala.id]}
+                enEspera={esperaPorSala[sala.id] || 0}
+                estaCargando={cargandoSalaId === sala.id}
+                onLlamarSiguiente={handleLlamarSiguiente}
+                onReLlamar={handleReLlamar}
+                onDescartar={handleDescartar}
+                onImprimirPapel={handleImprimirPapel}
+                onEliminarSala={handleEliminarSala}
+              />
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* Pestaña 2: Analítica y Estadísticas */}
+      {tabActiva === 'analytics' && <AnalyticsDashboard />}
     </div>
   )
 }

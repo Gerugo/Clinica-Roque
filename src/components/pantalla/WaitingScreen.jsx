@@ -3,6 +3,7 @@ import { DURACION_OVERLAY_PANTALLA_MS } from '../../utils/constants.js'
 import { useAudioChime } from '../../hooks/useAudioChime.js'
 import { useRealtimeSubscription } from '../../hooks/useRealtime.js'
 import { obtenerSalasActivas } from '../../services/rooms.js'
+import { voiceService } from '../../services/voice.js'
 import { supabase } from '../../services/supabase.js'
 import { AudioPermissionModal } from './AudioPermissionModal.jsx'
 import { RoomGrid } from './RoomGrid.jsx'
@@ -16,6 +17,13 @@ export function WaitingScreen() {
   const [llamadaActiva, setLlamadaActiva] = useState(null)
 
   const temporizadorRef = useRef(null)
+  const voiceTimeoutRef = useRef(null)
+  const salasRef = useRef(salas)
+
+  useEffect(() => {
+    salasRef.current = salas
+  }, [salas])
+
   const { reproducirChimePantalla, unlockAudio } = useAudioChime()
 
   // 1. Cargar salas y últimos turnos llamados
@@ -83,8 +91,20 @@ export function WaitingScreen() {
           [turnoActualizado.cola_id]: turnoActualizado.numero,
         }))
 
-        // Reproducir sonido y mostrar overlay de turno llamado
+        // A. Reproducir sonido de campanilla (Chime)
         reproducirChimePantalla()
+
+        // B. Anunciar por voz sintetizada en español tras terminar el sonido (550ms)
+        const salaEncontrada = salasRef.current.find((s) => s.id === turnoActualizado.cola_id)
+        if (voiceTimeoutRef.current) clearTimeout(voiceTimeoutRef.current)
+        voiceTimeoutRef.current = setTimeout(() => {
+          voiceService.anunciarTurno(
+            turnoActualizado.numero,
+            salaEncontrada ? salaEncontrada.nombre : 'Consulta'
+          )
+        }, 550)
+
+        // C. Mostrar overlay de turno llamado
         setLlamadaActiva({
           cola_id: turnoActualizado.cola_id,
           numero: turnoActualizado.numero,
@@ -102,6 +122,7 @@ export function WaitingScreen() {
   useEffect(() => {
     return () => {
       if (temporizadorRef.current) clearTimeout(temporizadorRef.current)
+      if (voiceTimeoutRef.current) clearTimeout(voiceTimeoutRef.current)
     }
   }, [])
 
