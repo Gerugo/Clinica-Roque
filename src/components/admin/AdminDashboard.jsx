@@ -17,6 +17,26 @@ import { RoomCard } from './RoomCard.jsx'
 import { AnalyticsDashboard } from './AnalyticsDashboard.jsx'
 import '../../styles/admin.css'
 
+function StethoscopeIcon({ color = 'currentColor' }) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: 'middle', marginRight: '6px' }}>
+      <path d="M4.8 2.3A.3.3 0 1 0 5 2H4a2 2 0 0 0-2 2v5a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6V4a2 2 0 0 0-2-2h-1a.2.2 0 1 0 .3.3" />
+      <path d="M8 15v1a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6v-4" />
+      <circle cx="20" cy="10" r="2" />
+    </svg>
+  )
+}
+
+function BarChartTabIcon({ color = 'currentColor' }) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: 'middle', marginRight: '6px' }}>
+      <line x1="12" y1="20" x2="12" y2="10" />
+      <line x1="18" y1="20" x2="18" y2="4" />
+      <line x1="6" y1="20" x2="6" y2="16" />
+    </svg>
+  )
+}
+
 export function AdminDashboard() {
   const { autenticado, cargando: cargandoAuth, errorAuth, procesandoLogin, login, logout } = useAuth()
 
@@ -211,13 +231,15 @@ export function AdminDashboard() {
           onClick={() => setTabActiva('salas')}
           className={`admin-tab-btn ${tabActiva === 'salas' ? 'admin-tab-btn-active' : ''}`}
         >
-          🩺 Salas y Turnos
+          <StethoscopeIcon />
+          Salas y Turnos
         </button>
         <button
           onClick={() => setTabActiva('analytics')}
           className={`admin-tab-btn ${tabActiva === 'analytics' ? 'admin-tab-btn-active' : ''}`}
         >
-          📊 Analítica y KPIs
+          <BarChartTabIcon />
+          Analítica y KPIs
         </button>
       </nav>
 
