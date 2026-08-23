@@ -36,6 +36,44 @@
   font-size: 1rem;
 }
 
+/* Banner de Aviso Llamado en la vista principal */
+.recepcion-called-banner {
+  max-width: 420px;
+  margin: 0 auto 1.5rem auto;
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  color: white;
+  padding: 1rem 1.25rem;
+  border-radius: var(--radius-lg);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 10px 20px -5px rgba(5, 150, 105, 0.35);
+}
+
+.recepcion-called-banner-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.recepcion-called-banner-sub {
+  font-size: 0.82rem;
+  opacity: 0.9;
+  margin: 2px 0 0 0;
+}
+
+.recepcion-called-banner-btn {
+  padding: 6px 14px;
+  background: white;
+  color: #047857;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
 /* Pantalla de Turno Llamado Activo (¡ES SU TURNO!) */
 .recepcion-called-screen {
   min-height: 100vh;
@@ -87,6 +125,49 @@
   font-size: 1.05rem;
   margin-top: 0.75rem;
   max-width: 320px;
+}
+
+/* Botones de acción en la pantalla de llamado */
+.recepcion-called-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 2.5rem;
+  width: 100%;
+  max-width: 320px;
+}
+
+.recepcion-called-btn-primary {
+  padding: 16px 24px;
+  background: linear-gradient(135deg, var(--success-500) 0%, var(--success-600) 100%);
+  color: white;
+  border-radius: var(--radius-md);
+  font-size: 1.05rem;
+  font-weight: 800;
+  box-shadow: 0 10px 20px -5px rgba(16, 185, 129, 0.4);
+  transition: transform 0.1s ease;
+  border: none;
+  cursor: pointer;
+}
+
+.recepcion-called-btn-primary:active {
+  transform: scale(0.98);
+}
+
+.recepcion-called-btn-secondary {
+  padding: 12px 20px;
+  background-color: white;
+  color: var(--slate-700);
+  border: 1px solid var(--slate-300);
+  border-radius: var(--radius-md);
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.recepcion-called-btn-secondary:hover {
+  background-color: var(--slate-100);
 }
 
 /* Tarjeta de Turno en Espera */

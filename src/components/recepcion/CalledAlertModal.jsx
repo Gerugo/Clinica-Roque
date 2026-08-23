@@ -1,4 +1,4 @@
-export function CalledAlertModal({ turno }) {
+export function CalledAlertModal({ turno, onEntendido, onVolver }) {
   if (!turno) return null
 
   return (
@@ -11,6 +11,22 @@ export function CalledAlertModal({ turno }) {
       <p className="recepcion-called-instruction">
         El médico le está esperando en la consulta.
       </p>
+
+      <div className="recepcion-called-actions">
+        <button
+          onClick={() => onEntendido(turno.id)}
+          className="recepcion-called-btn-primary"
+        >
+          ✓ Entendido, ya voy a consulta
+        </button>
+
+        <button
+          onClick={() => onVolver(turno.id)}
+          className="recepcion-called-btn-secondary"
+        >
+          Volver a selección de consultas
+        </button>
+      </div>
     </div>
   )
 }

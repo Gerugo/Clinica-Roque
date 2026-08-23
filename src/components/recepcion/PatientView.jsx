@@ -24,6 +24,7 @@ export function PatientView() {
   const [mostrarRecuperar, setMostrarRecuperar] = useState(false)
   const [buscandoTurno, setBuscandoTurno] = useState(false)
   const [errorRecuperar, setErrorRecuperar] = useState('')
+  const [avisosOcultosIds, setAvisosOcultosIds] = useState([])
 
   // 1. Estado de turnos del paciente inicializado desde LocalStorage
   const [misTurnos, setMisTurnos] = useState(() => {
@@ -43,9 +44,16 @@ export function PatientView() {
     [misTurnos]
   )
 
-  const turnoLlamado = useMemo(
-    () => misTurnos.find((t) => t.estado === 'llamado'),
-    [misTurnos]
+  // Turno llamado activo que aún no ha sido minimizado
+  const turnoLlamadoVisible = useMemo(
+    () => misTurnos.find((t) => t.estado === 'llamado' && !avisosOcultosIds.includes(t.id)),
+    [misTurnos, avisosOcultosIds]
+  )
+
+  // Turno llamado que está minimizado (para mostrar banner de acceso rápido)
+  const turnoLlamadoMinimizado = useMemo(
+    () => misTurnos.find((t) => t.estado === 'llamado' && avisosOcultosIds.includes(t.id)),
+    [misTurnos, avisosOcultosIds]
   )
 
   // 3. Activar WakeLock mientras haya turnos en espera
@@ -176,6 +184,8 @@ export function PatientView() {
             navigator.vibrate([300, 100, 300, 100, 300])
           }
           reproducirChimeMovil()
+          // Asegurarse de que el modal se muestre
+          setAvisosOcultosIds((prev) => prev.filter((id) => id !== turnoActualizado.id))
         }
 
         nuevosTurnos[index] = {
@@ -187,7 +197,23 @@ export function PatientView() {
     },
   })
 
-  // 8. Solicitar un nuevo turno
+  // 8. Acciones de Llamado
+  const handleEntendidoLlamado = (turnoId) => {
+    // Quitar de mis turnos porque el paciente ya entra a consulta
+    setMisTurnos((prev) => prev.filter((t) => t.id !== turnoId))
+    setAvisosOcultosIds((prev) => prev.filter((id) => id !== turnoId))
+  }
+
+  const handleVolverSeleccion = (turnoId) => {
+    // Minimizar la pantalla completa para volver a ver las consultas
+    setAvisosOcultosIds((prev) => [...prev, turnoId])
+  }
+
+  const handleReabrirAviso = (turnoId) => {
+    setAvisosOcultosIds((prev) => prev.filter((id) => id !== turnoId))
+  }
+
+  // 9. Solicitar un nuevo turno
   const handlePedirTurno = async (sala) => {
     if (misTurnos.some((t) => t.cola_id === sala.id && t.estado === 'espera')) {
       alert(`Ya tienes un turno activo para ${sala.nombre}`)
@@ -236,7 +262,7 @@ export function PatientView() {
     setCargando(false)
   }
 
-  // 9. Recuperar turno por código
+  // 10. Recuperar turno por código
   const handleRecuperarTurno = async (salaId, codigo) => {
     setErrorRecuperar('')
     setBuscandoTurno(true)
@@ -270,13 +296,39 @@ export function PatientView() {
     setMostrarRecuperar(false)
   }
 
-  // Si el paciente ha sido llamado, mostrar pantalla prioritaria verde
-  if (turnoLlamado) {
-    return <CalledAlertModal turno={turnoLlamado} />
+  // Si el paciente ha sido llamado y el aviso no está minimizado, mostrar pantalla completa
+  if (turnoLlamadoVisible) {
+    return (
+      <CalledAlertModal
+        turno={turnoLlamadoVisible}
+        onEntendido={handleEntendidoLlamado}
+        onVolver={handleVolverSeleccion}
+      />
+    )
   }
 
   return (
     <div className="recepcion-container">
+      {/* Banner de aviso activo si fue minimizado */}
+      {turnoLlamadoMinimizado && (
+        <div className="recepcion-called-banner animate-fade-in" role="alert">
+          <div>
+            <p className="recepcion-called-banner-title">
+              ¡Turno {turnoLlamadoMinimizado.numero} llamado!
+            </p>
+            <p className="recepcion-called-banner-sub">
+              Pase a {turnoLlamadoMinimizado.sala}
+            </p>
+          </div>
+          <button
+            onClick={() => handleReabrirAviso(turnoLlamadoMinimizado.id)}
+            className="recepcion-called-banner-btn"
+          >
+            Ver aviso
+          </button>
+        </div>
+      )}
+
       {/* Encabezado */}
       <header className="recepcion-header">
         <img
