@@ -30,6 +30,9 @@ export const AUDIO_CONFIG = {
 // Tiempo de duración del overlay de turno en TV (en ms)
 export const DURACION_OVERLAY_PANTALLA_MS = 12000
 
+// Tiempo de seguro para auto-cierre de consulta olvidada (30 minutos en ms)
+export const TIEMPO_AUTO_CIERRE_CONSULTA_MS = 30 * 60 * 1000
+
 // Configuración de estimación de colas (ETA)
 export const ETA_CONFIG = {
   MINUTOS_DEFAULT_POR_PACIENTE: 8,

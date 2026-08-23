@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { TIEMPO_AUTO_CIERRE_CONSULTA_MS } from '../../utils/constants.js'
 import { useAuth } from '../../hooks/useAuth.js'
 import { useRealtimeSubscription } from '../../hooks/useRealtime.js'
 import {
@@ -77,7 +78,40 @@ export function AdminDashboard() {
     }
   }, [autenticado])
 
-  // 2. Suscripción Realtime completa (INSERT, UPDATE, DELETE)
+  // 2. Acciones de Administración
+  const handleFinalizarConsulta = useCallback(async (salaId) => {
+    const turno = turnoActual[salaId]
+    if (!turno) return
+
+    setCargandoSalaId(salaId)
+    const { exito } = await finalizarConsultaPaciente(turno.id)
+    if (exito) {
+      setTurnoActual((prev) => ({ ...prev, [salaId]: null }))
+    }
+    setCargandoSalaId(null)
+  }, [turnoActual])
+
+  // 3. Seguro periódico: auto-cerrar en el panel médico consultas de más de 30 minutos
+  useEffect(() => {
+    if (!autenticado) return
+
+    const intervaloSeguro = setInterval(() => {
+      const ahora = Date.now()
+      Object.keys(turnoActual).forEach((colaId) => {
+        const turno = turnoActual[colaId]
+        if (turno) {
+          const horaLlamada = new Date(turno.updated_at || turno.created_at).getTime()
+          if (ahora - horaLlamada >= TIEMPO_AUTO_CIERRE_CONSULTA_MS) {
+            handleFinalizarConsulta(Number(colaId))
+          }
+        }
+      })
+    }, 60000)
+
+    return () => clearInterval(intervaloSeguro)
+  }, [autenticado, turnoActual, handleFinalizarConsulta])
+
+  // 4. Suscripción Realtime completa (INSERT, UPDATE, DELETE)
   useRealtimeSubscription({
     channelName: 'admin-turnos-realtime',
     table: 'turnos',
@@ -122,7 +156,6 @@ export function AdminDashboard() {
     },
   })
 
-  // 3. Acciones de Administración
   const handleCrearSala = async (e) => {
     e.preventDefault()
     if (!nuevaConsulta.trim() || creandoCola) return
@@ -165,20 +198,6 @@ export function AdminDashboard() {
         ...prev,
         [salaId]: Math.max(0, (prev[salaId] || 1) - 1),
       }))
-    }
-    setCargandoSalaId(null)
-  }
-
-  const handleFinalizarConsulta = async (salaId) => {
-    const turno = turnoActual[salaId]
-    if (!turno) return
-
-    setCargandoSalaId(salaId)
-    const { exito } = await finalizarConsultaPaciente(turno.id)
-    if (exito) {
-      setTurnoActual((prev) => ({ ...prev, [salaId]: null }))
-    } else {
-      alert('Error al finalizar la consulta.')
     }
     setCargandoSalaId(null)
   }

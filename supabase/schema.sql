@@ -60,7 +60,12 @@ BEGIN
     -- Obtener el nombre de la sala
     SELECT nombre INTO v_cola_nombre FROM public.colas WHERE id = p_cola_id;
     
-    -- Bloquear y obtener el primer turno en espera de forma atómica
+    -- Auto-cerrar turnos anteriores olvidados que lleven más de 30 minutos llamados
+    UPDATE public.turnos
+    SET estado = 'atendido', updated_at = NOW()
+    WHERE cola_id = p_cola_id AND estado = 'llamado' AND updated_at < NOW() - INTERVAL '30 minutes';
+
+    -- Seleccionar y bloquear el siguiente turno en espera atómicamente
     SELECT * INTO v_siguiente_turno
     FROM public.turnos
     WHERE cola_id = p_cola_id AND estado = 'espera'

@@ -1,5 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
-import { DURACION_OVERLAY_PANTALLA_MS } from '../../utils/constants.js'
+import {
+  DURACION_OVERLAY_PANTALLA_MS,
+  TIEMPO_AUTO_CIERRE_CONSULTA_MS,
+} from '../../utils/constants.js'
 import { useAudioChime } from '../../hooks/useAudioChime.js'
 import { useRealtimeSubscription } from '../../hooks/useRealtime.js'
 import { obtenerSalasActivas } from '../../services/rooms.js'
@@ -12,6 +15,7 @@ import '../../styles/pantalla.css'
 
 export function WaitingScreen() {
   const [turnosPorSala, setTurnosPorSala] = useState({})
+  const [timestampPorSala, setTimestampPorSala] = useState({})
   const [salas, setSalas] = useState([])
   const [audioHabilitado, setAudioHabilitado] = useState(false)
   const [llamadaActiva, setLlamadaActiva] = useState(null)
@@ -26,7 +30,7 @@ export function WaitingScreen() {
 
   const { reproducirChimePantalla, unlockAudio } = useAudioChime()
 
-  // 1. Cargar salas y últimos turnos llamados
+  // 1. Cargar salas y últimos turnos llamados (respetando el seguro de 30 min)
   useEffect(() => {
     let activo = true
 
@@ -39,26 +43,46 @@ export function WaitingScreen() {
       const salaIds = colasData.map((s) => s.id)
       const { data: turnosLlamados } = await supabase
         .from('turnos')
-        .select('cola_id, numero')
+        .select('id, cola_id, numero, updated_at, created_at')
         .in('cola_id', salaIds)
         .eq('estado', 'llamado')
         .order('updated_at', { ascending: false })
 
       const turnosIniciales = {}
+      const timestampsIniciales = {}
+      const ahora = Date.now()
+      const turnosParaAutoCerrar = []
+
       salaIds.forEach((id) => {
         turnosIniciales[id] = '-'
+        timestampsIniciales[id] = 0
       })
 
       if (turnosLlamados) {
         turnosLlamados.forEach((t) => {
-          if (turnosIniciales[t.cola_id] === '-') {
+          const horaLlamada = new Date(t.updated_at || t.created_at).getTime()
+          const transcurrido = ahora - horaLlamada
+
+          if (transcurrido >= TIEMPO_AUTO_CIERRE_CONSULTA_MS) {
+            turnosParaAutoCerrar.push(t.id)
+          } else if (turnosIniciales[t.cola_id] === '-') {
             turnosIniciales[t.cola_id] = t.numero
+            timestampsIniciales[t.cola_id] = horaLlamada
           }
         })
       }
 
+      if (turnosParaAutoCerrar.length > 0) {
+        supabase
+          .from('turnos')
+          .update({ estado: 'atendido' })
+          .in('id', turnosParaAutoCerrar)
+          .then(() => {})
+      }
+
       if (activo) {
         setTurnosPorSala(turnosIniciales)
+        setTimestampPorSala(timestampsIniciales)
       }
     }
 
@@ -69,7 +93,32 @@ export function WaitingScreen() {
     }
   }, [])
 
-  // 2. Suscripción Realtime a actualización de turnos
+  // 2. Intervalo periódico de seguro: limpiar en pantalla salas que lleven más de 30 min sin cerrar
+  useEffect(() => {
+    const intervaloSeguro = setInterval(() => {
+      const ahora = Date.now()
+      setTurnosPorSala((prevTurnos) => {
+        let hayCambios = false
+        const nuevosTurnos = { ...prevTurnos }
+
+        Object.keys(timestampPorSala).forEach((colaId) => {
+          const ts = timestampPorSala[colaId]
+          if (ts > 0 && ahora - ts >= TIEMPO_AUTO_CIERRE_CONSULTA_MS) {
+            if (nuevosTurnos[colaId] !== '-') {
+              nuevosTurnos[colaId] = '-'
+              hayCambios = true
+            }
+          }
+        })
+
+        return hayCambios ? nuevosTurnos : prevTurnos
+      })
+    }, 60000) // cada minuto
+
+    return () => clearInterval(intervaloSeguro)
+  }, [timestampPorSala])
+
+  // 3. Suscripción Realtime a actualización de turnos
   useRealtimeSubscription({
     channelName: 'tv-pantalla-turnos',
     table: 'turnos',
@@ -83,13 +132,22 @@ export function WaitingScreen() {
           ...prev,
           [turnoActualizado.cola_id]: '-',
         }))
+        setTimestampPorSala((prev) => ({
+          ...prev,
+          [turnoActualizado.cola_id]: 0,
+        }))
         return
       }
 
       if (turnoActualizado.estado === 'llamado') {
+        const ahora = Date.now()
         setTurnosPorSala((prev) => ({
           ...prev,
           [turnoActualizado.cola_id]: turnoActualizado.numero,
+        }))
+        setTimestampPorSala((prev) => ({
+          ...prev,
+          [turnoActualizado.cola_id]: ahora,
         }))
 
         // A. Reproducir sonido de campanilla (Chime)
