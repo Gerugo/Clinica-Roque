@@ -77,7 +77,8 @@ export function WaitingScreen() {
     onPayload: (payload) => {
       const turnoActualizado = payload.new
 
-      if (turnoActualizado.estado === 'descartado') {
+      // Si el turno fue descartado o finalizado (atendido), liberar la sala en pantalla
+      if (['descartado', 'atendido'].includes(turnoActualizado.estado)) {
         setTurnosPorSala((prev) => ({
           ...prev,
           [turnoActualizado.cola_id]: '-',

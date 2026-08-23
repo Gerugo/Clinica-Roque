@@ -4,6 +4,7 @@ export function RoomCard({
   enEspera,
   estaCargando,
   onLlamarSiguiente,
+  onFinalizarConsulta,
   onReLlamar,
   onDescartar,
   onImprimirPapel,
@@ -80,9 +81,18 @@ export function RoomCard({
       </div>
 
       {/* Acciones de turno activo */}
-      <div className="admin-actions-row">
-        {turnoActual && (
-          <>
+      {turnoActual && (
+        <div className="admin-actions-column">
+          <button
+            onClick={() => onFinalizarConsulta(sala.id)}
+            disabled={estaCargando}
+            className="admin-btn-finish"
+            title="Dar por atendida la consulta médica y liberar la sala"
+          >
+            ✓ Finalizar Consulta
+          </button>
+
+          <div className="admin-actions-row">
             <button
               onClick={() => onReLlamar(sala.id)}
               disabled={estaCargando}
@@ -95,13 +105,13 @@ export function RoomCard({
               onClick={() => onDescartar(sala.id)}
               disabled={estaCargando}
               className="admin-btn-discard"
-              title="Descartar este turno"
+              title="Descartar este turno si no se presenta"
             >
               ✕ Descartar
             </button>
-          </>
-        )}
-      </div>
+          </div>
+        </div>
+      )}
 
       {/* Botón Principal: Llamar Siguiente */}
       <button

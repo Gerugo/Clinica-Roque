@@ -198,7 +198,26 @@ export async function reLlamarPaciente(turno, nombreSala) {
 }
 
 /**
- * Descarta un turno
+ * Finaliza la consulta médica de un paciente con éxito (estado = 'atendido')
+ */
+export async function finalizarConsultaPaciente(turnoId) {
+  if (!turnoId) return { exito: false }
+
+  const { error } = await supabase
+    .from('turnos')
+    .update({ estado: 'atendido' })
+    .eq('id', turnoId)
+
+  if (error) {
+    console.error('Error al finalizar consulta:', error)
+    return { exito: false, error }
+  }
+
+  return { exito: true }
+}
+
+/**
+ * Descarta un turno (paciente no asistió o canceló)
  */
 export async function descartarPaciente(turnoId) {
   if (!turnoId) return { exito: false }

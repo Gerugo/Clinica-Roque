@@ -8,6 +8,7 @@ import {
 } from '../../services/rooms.js'
 import {
   llamarSiguientePaciente,
+  finalizarConsultaPaciente,
   reLlamarPaciente,
   descartarPaciente,
   crearTurnoManualConImpresion,
@@ -168,6 +169,20 @@ export function AdminDashboard() {
     setCargandoSalaId(null)
   }
 
+  const handleFinalizarConsulta = async (salaId) => {
+    const turno = turnoActual[salaId]
+    if (!turno) return
+
+    setCargandoSalaId(salaId)
+    const { exito } = await finalizarConsultaPaciente(turno.id)
+    if (exito) {
+      setTurnoActual((prev) => ({ ...prev, [salaId]: null }))
+    } else {
+      alert('Error al finalizar la consulta.')
+    }
+    setCargandoSalaId(null)
+  }
+
   const handleReLlamar = async (salaId) => {
     const turno = turnoActual[salaId]
     if (!turno) return
@@ -274,6 +289,7 @@ export function AdminDashboard() {
                 enEspera={esperaPorSala[sala.id] || 0}
                 estaCargando={cargandoSalaId === sala.id}
                 onLlamarSiguiente={handleLlamarSiguiente}
+                onFinalizarConsulta={handleFinalizarConsulta}
                 onReLlamar={handleReLlamar}
                 onDescartar={handleDescartar}
                 onImprimirPapel={handleImprimirPapel}

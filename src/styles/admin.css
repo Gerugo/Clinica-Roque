@@ -255,10 +255,37 @@
   font-family: var(--font-mono);
 }
 
+.admin-actions-column {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 1.25rem;
+}
+
+.admin-btn-finish {
+  width: 100%;
+  padding: 12px;
+  background-color: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 0.95rem;
+  transition: background-color 0.2s ease, transform 0.1s ease;
+  cursor: pointer;
+}
+
+.admin-btn-finish:hover:not(:disabled) {
+  background-color: rgba(16, 185, 129, 0.28);
+}
+
+.admin-btn-finish:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
 .admin-actions-row {
   display: flex;
   gap: 10px;
-  margin-bottom: 1.25rem;
   min-height: 44px;
 }
 
